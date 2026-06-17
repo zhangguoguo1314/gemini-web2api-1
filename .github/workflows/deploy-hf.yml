@@ -1,0 +1,55 @@
+name: 部署到 Hugging Face Spaces
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  deploy-hf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: 克隆 HF Space 仓库
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git clone "https://zhangguoguo1314:${HF_TOKEN}@huggingface.co/spaces/zhangguoguo1314/gemini-web2api" /tmp/hf-space 2>&1 || \
+          echo "Space 尚未创建，将跳过部署。请先在 HF 上创建名为 gemini-web2api 的 Docker Space。"
+
+      - name: 检查 Space 是否存在
+        id: check_space
+        run: |
+          if [ -d "/tmp/hf-space/.git" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 复制文件到 HF Space
+        if: steps.check_space.outputs.exists == 'true'
+        run: |
+          # 复制 HF 专用 Dockerfile
+          cp Dockerfile.hf /tmp/hf-space/Dockerfile
+          # 复制 README
+          cp README_HF.md /tmp/hf-space/README.md
+          # 复制源码
+          cp -r gemini_web2api/ /tmp/hf-space/
+          cp gemini_web2api.py /tmp/hf-space/
+          cp requirements.txt /tmp/hf-space/
+          cp config.example.json /tmp/hf-space/
+
+      - name: 推送到 Hugging Face
+        if: steps.check_space.outputs.exists == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          cd /tmp/hf-space
+          git add -A
+          git diff --cached --quiet || (git commit -m "自动部署: $(echo ${{ github.sha }} | cut -c1-8)" && git push)

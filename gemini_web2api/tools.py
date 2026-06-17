@@ -89,9 +89,9 @@ def messages_to_prompt(messages: list, tools: list = None, tool_choice=None) -> 
                 if c.get("type") in ("text", "input_text"):
                     text_parts.append(c.get("text", ""))
                 elif c.get("type") == "image_url":
-                    text_parts.append("[Note: Image input not supported in this API. Please describe the image in text.]")
+                    text_parts.append("[注意：本 API 不支持图片输入，请用文字描述图片内容。]")
                 elif c.get("type") == "image":
-                    text_parts.append("[Note: Image input not supported in this API. Please describe the image in text.]")
+                    text_parts.append("[注意：本 API 不支持图片输入，请用文字描述图片内容。]")
             content = " ".join(text_parts)
 
         if role == "system":

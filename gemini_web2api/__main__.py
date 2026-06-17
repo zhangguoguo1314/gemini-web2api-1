@@ -10,11 +10,11 @@ from . import __version__
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Gemini Web to OpenAI API")
+    parser = argparse.ArgumentParser(description="Gemini 网页转 OpenAI API 服务")
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--cookie-file", type=str, default=None)
-    parser.add_argument("--proxy", type=str, default=None, help="HTTP proxy, e.g. http://127.0.0.1:7890")
+    parser.add_argument("--proxy", type=str, default=None, help="HTTP 代理，例如 http://127.0.0.1:7890")
     parser.add_argument("--version", action="version", version=f"gemini-web2api {__version__}")
     args = parser.parse_args()
 
@@ -32,17 +32,17 @@ def main():
     port = CONFIG["port"]
     server = ThreadedServer((CONFIG["host"], port), GeminiHandler)
     print(f"gemini-web2api v{__version__}")
-    print(f"  Listening: http://0.0.0.0:{port}")
-    print(f"  Base URL:  http://localhost:{port}/v1")
-    print(f"  Models:    {', '.join(MODELS.keys())}")
-    print(f"  Cookie:    {'yes' if CONFIG.get('cookie_file') else 'none (anonymous)'}")
-    print(f"  Proxy:     {CONFIG.get('proxy') or 'system env'}")
-    print(f"  Streaming: {'httpx (true streaming)' if HAS_HTTPX else 'urllib (buffered)'}")
+    print(f"  监听地址:  http://0.0.0.0:{port}")
+    print(f"  接口地址:  http://localhost:{port}/v1")
+    print(f"  可用模型:  {', '.join(MODELS.keys())}")
+    print(f"  Cookie:    {'已配置' if CONFIG.get('cookie_file') else '未配置（匿名模式）'}")
+    print(f"  代理:       {CONFIG.get('proxy') or '使用系统环境变量'}")
+    print(f"  流式传输:   {'httpx（真流式）' if HAS_HTTPX else 'urllib（缓冲模式）'}")
     print()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopped.")
+        print("\n服务已停止。")
         server.shutdown()
 
 

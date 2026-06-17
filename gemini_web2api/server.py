@@ -36,7 +36,7 @@ def _upload_images(images: list) -> list:
                     ref = upload_image(data, "image.png", mime or "image/png")
                     file_refs.append(ref)
         except Exception as e:
-            log(f"Image upload failed: {e}")
+            log(f"图片上传失败: {e}")
     return file_refs if file_refs else None
 
 
@@ -84,7 +84,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             if self.path.startswith("/v1/") and not self._authorized():
-                self.send_json({"error": {"message": "invalid api key"}}, 401)
+                self.send_json({"error": {"message": "无效的 API 密钥"}}, 401)
                 return
             if self.path == "/v1/models":
                 self.send_json({"object": "list", "data": [
@@ -101,14 +101,14 @@ class GeminiHandler(BaseHTTPRequestHandler):
             elif self.path == "/":
                 self.send_json({"status": "ok", "version": __version__, "models": list(MODELS.keys())})
             else:
-                self.send_json({"error": "not found"}, 404)
+                self.send_json({"error": "未找到"}, 404)
         except (BrokenPipeError, ConnectionResetError):
             pass
 
     def do_POST(self):
         try:
             if self.path.startswith("/v1/") and not self._authorized():
-                self.send_json({"error": {"message": "invalid api key"}}, 401)
+                self.send_json({"error": {"message": "无效的 API 密钥"}}, 401)
                 return
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length else b""
@@ -121,11 +121,11 @@ class GeminiHandler(BaseHTTPRequestHandler):
             elif ":streamGenerateContent" in self.path:
                 self._handle_google_generate(body, stream=True)
             else:
-                self.send_json({"error": "not found"}, 404)
+                self.send_json({"error": "未找到"}, 404)
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
-            log(f"POST error: {e}")
+            log(f"POST 请求错误: {e}")
             try:
                 self.send_json({"error": {"message": str(e)}}, 500)
             except:
@@ -136,7 +136,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
     def _handle_chat(self, body: bytes):
         req = self._parse_body(body)
         if req is None:
-            self.send_json({"error": {"message": "invalid JSON"}}, 400)
+            self.send_json({"error": {"message": "无效的 JSON 格式"}}, 400)
             return
         model_name, model_id, think_mode, err, extra_fields = resolve_model(
             req.get("model", CONFIG["default_model"]))
@@ -148,7 +148,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
         tool_choice = req.get("tool_choice", "auto")
         prompt, images = messages_to_prompt(req.get("messages", []), tools, tool_choice)
         if not prompt.strip():
-            self.send_json({"error": {"message": "empty prompt"}}, 400)
+            self.send_json({"error": {"message": "提示词为空"}}, 400)
             return
 
         stream = req.get("stream", False)
@@ -174,7 +174,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
         try:
             text = generate(prompt, model_id, think_mode, _upload_images(images), extra_fields)
         except Exception as e:
-            self.send_json({"error": {"message": f"upstream error: {e}"}}, 502)
+            self.send_json({"error": {"message": f"上游服务错误: {e}"}}, 502)
             return
 
         tool_calls = None
@@ -206,7 +206,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
     def _handle_responses(self, body: bytes):
         req = self._parse_body(body)
         if req is None:
-            self.send_json({"error": {"message": "invalid JSON"}}, 400)
+            self.send_json({"error": {"message": "无效的 JSON 格式"}}, 400)
             return
         model_name, model_id, think_mode, err, extra_fields = resolve_model(
             req.get("model", CONFIG["default_model"]))
@@ -259,13 +259,13 @@ class GeminiHandler(BaseHTTPRequestHandler):
         tool_choice = req.get("tool_choice", "auto")
         prompt, images = messages_to_prompt(messages, tools, tool_choice)
         if not prompt.strip():
-            self.send_json({"error": {"message": "empty input"}}, 400)
+            self.send_json({"error": {"message": "输入内容为空"}}, 400)
             return
 
         try:
             text = generate(prompt, model_id, think_mode, _upload_images(images), extra_fields)
         except Exception as e:
-            self.send_json({"error": {"message": f"upstream error: {e}"}}, 502)
+            self.send_json({"error": {"message": f"上游服务错误: {e}"}}, 502)
             return
 
         tool_calls = None
@@ -313,7 +313,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
     def _handle_google_generate(self, body: bytes, stream: bool):
         req = self._parse_body(body)
         if req is None:
-            self.send_json({"error": {"message": "invalid JSON"}}, 400)
+            self.send_json({"error": {"message": "无效的 JSON 格式"}}, 400)
             return
         m = re.match(r'/v1beta/models/([^:?]+)', self.path)
         model_name = m.group(1) if m else CONFIG["default_model"]
@@ -327,7 +327,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
         has_tools = bool(req.get("tools")) and fc_mode != "NONE"
         prompt, images = google_contents_to_prompt(req)
         if not prompt.strip():
-            self.send_json({"error": {"message": "empty content"}}, 400)
+            self.send_json({"error": {"message": "内容为空"}}, 400)
             return
 
         file_refs = _upload_images(images)
@@ -365,11 +365,11 @@ class GeminiHandler(BaseHTTPRequestHandler):
         try:
             text = generate(prompt, model_id, think_mode, file_refs, extra_fields)
         except Exception as e:
-            self.send_json({"error": {"message": f"upstream error: {e}"}}, 502)
+            self.send_json({"error": {"message": f"上游服务错误: {e}"}}, 502)
             return
 
         if not text:
-            log("Warning: empty response from Gemini")
+            log("警告: Gemini 返回空响应")
 
         response_parts = []
         if has_tools and text:
@@ -382,7 +382,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
             else:
                 response_parts.append({"text": text})
         else:
-            response_parts.append({"text": text or "I apologize, but I was unable to generate a response. Please try again."})
+            response_parts.append({"text": text or "抱歉，无法生成回复，请稍后重试。"})
 
         candidate = {
             "content": {"parts": response_parts, "role": "model"},

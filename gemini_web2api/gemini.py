@@ -67,7 +67,7 @@ def load_cookie() -> tuple:
         _cookie_cache.update({"str": cookie_str, "sapisid": sapisid or None, "mtime": mtime})
         return cookie_str, sapisid if sapisid else None
     except Exception as e:
-        log(f"Cookie load error: {e}")
+        log(f"Cookie 加载失败: {e}")
         return _cookie_cache["str"], _cookie_cache["sapisid"]
 
 
@@ -214,7 +214,7 @@ def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None
         except Exception as e:
             last_err = e
             if attempt < CONFIG["retry_attempts"] - 1:
-                log(f"Retry {attempt+1}/{CONFIG['retry_attempts']}: {e}")
+                log(f"重试 {attempt+1}/{CONFIG['retry_attempts']}: {e}")
                 time.sleep(CONFIG["retry_delay_sec"])
     raise last_err
 
@@ -252,6 +252,6 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
         except Exception as e:
             last_err = e
             if attempt < CONFIG["retry_attempts"] - 1:
-                log(f"Stream retry {attempt+1}/{CONFIG['retry_attempts']}: {e}")
+                log(f"流式重试 {attempt+1}/{CONFIG['retry_attempts']}: {e}")
                 time.sleep(CONFIG["retry_delay_sec"])
     raise last_err

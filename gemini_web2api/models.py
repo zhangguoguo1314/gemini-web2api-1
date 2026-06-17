@@ -6,31 +6,31 @@
 MODELS = {
     "gemini-3.5-flash": {
         "mode": 1, "think": 4,
-        "desc": "Fast general-purpose model",
+        "desc": "快速通用模型",
     },
     "gemini-3.5-flash-thinking": {
         "mode": 2, "think": 0,
-        "desc": "Deep thinking mode, longest output (~20k chars)",
+        "desc": "深度思考模式，最长输出（约2万字符）",
     },
     "gemini-3.1-pro": {
         "mode": 3, "think": 4,
-        "desc": "Pro model (requires cookie for real routing)",
+        "desc": "Pro 模型（需要 Cookie 才能真实路由）",
     },
     "gemini-3.1-pro-enhanced": {
         "mode": 3, "think": 4, "extra": {31: 2, 80: 3},
-        "desc": "Pro with enhanced output (experimental)",
+        "desc": "Pro 增强输出（实验性）",
     },
     "gemini-auto": {
         "mode": 4, "think": 4,
-        "desc": "Auto model selection",
+        "desc": "自动模型选择",
     },
     "gemini-3.5-flash-thinking-lite": {
         "mode": 5, "think": 0,
-        "desc": "Dynamic thinking with adaptive depth",
+        "desc": "自适应深度思考",
     },
     "gemini-flash-lite": {
         "mode": 6, "think": 4,
-        "desc": "Lightweight fast model",
+        "desc": "轻量快速模型",
     },
 }
 
@@ -47,11 +47,11 @@ def resolve_model(model_name: str, default: str = "gemini-3.5-flash"):
         try:
             think_override = int(think_str)
         except ValueError:
-            return None, None, None, f"Invalid think level: {think_str}", None
+            return None, None, None, f"无效的思考级别: {think_str}", None
     cfg = MODELS.get(model_name)
     if not cfg:
         from .gemini import log
-        log(f"Unknown model '{model_name}', falling back to '{default}'")
+        log(f"未知模型 '{model_name}'，回退到 '{default}'")
         model_name = default
         cfg = MODELS[default]
     mode_id = cfg["mode"]

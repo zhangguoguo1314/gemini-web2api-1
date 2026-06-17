@@ -1,0 +1,17 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY gemini_web2api/ ./gemini_web2api/
+COPY gemini_web2api.py ./
+
+# HF Spaces 默认端口为 7860
+COPY config.example.json ./config.json
+RUN sed -i 's/"port": 8081/"port": 7860/' config.json
+
+EXPOSE 7860
+
+CMD ["python", "-m", "gemini_web2api", "--config", "/app/config.json"]

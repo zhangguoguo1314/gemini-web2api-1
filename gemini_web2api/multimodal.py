@@ -34,7 +34,7 @@ def _get_page_tokens() -> dict:
                 tokens[key] = m.group(1)
         return tokens
     except Exception as e:
-        log(f"Page token fetch failed: {e}")
+        log(f"页面 Token 获取失败: {e}")
         return {}
 
 
@@ -90,9 +90,9 @@ def upload_image(image_bytes: bytes, filename: str = "image.png", mime_type: str
 
     upload_url = resp.headers.get("X-Goog-Upload-URL") or resp.headers.get("x-goog-upload-url")
     if not upload_url:
-        raise RuntimeError(f"No upload URL in response headers: {dict(resp.headers)}")
+        raise RuntimeError(f"响应头中无上传 URL: {dict(resp.headers)}")
 
-    log(f"Upload session started: {upload_url[:80]}...")
+    log(f"上传会话已建立: {upload_url[:80]}...")
 
     # Step 2: Upload file data + finalize
     upload_headers = {
@@ -110,9 +110,9 @@ def upload_image(image_bytes: bytes, filename: str = "image.png", mime_type: str
 
     file_ref = resp2.read().decode().strip()
     if not file_ref or not file_ref.startswith("/"):
-        raise RuntimeError(f"Invalid file reference: {file_ref[:100]}")
+        raise RuntimeError(f"无效的文件引用: {file_ref[:100]}")
 
-    log(f"Image uploaded: {filename} -> {file_ref[:50]}...")
+    log(f"图片已上传: {filename} -> {file_ref[:50]}...")
     return file_ref
 
 
@@ -123,5 +123,5 @@ def fetch_image_bytes(url: str) -> bytes:
         resp = urllib.request.urlopen(req, timeout=30)
         return resp.read()
     except Exception as e:
-        log(f"Image fetch failed: {e}")
+        log(f"图片获取失败: {e}")
         return b""
