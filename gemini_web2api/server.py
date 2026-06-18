@@ -1,4 +1,4 @@
-"""HTTP server: OpenAI-compatible API endpoints."""
+"""HTTP server: OpenAI-compatible API endpoints + Admin UI."""
 import json
 import time
 import uuid
@@ -13,6 +13,12 @@ from .gemini import generate, generate_stream, log
 from .tools import messages_to_prompt, parse_tool_calls, google_contents_to_prompt, parse_google_function_calls
 from .multimodal import upload_image, fetch_image_bytes
 from . import __version__
+from .admin import (
+    is_password_set, set_password, verify_admin_password,
+    create_session, verify_session, clear_session,
+    set_config_file, get_current_config, update_config,
+    save_cookie, get_cookie
+)
 
 # Admin UI static file path
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -79,6 +85,22 @@ class GeminiHandler(BaseHTTPRequestHandler):
         key = auth[7:] if auth.startswith("Bearer ") else self.headers.get("x-api-key", "")
         return key in keys
 
+    def _get_cookie(self, name: str) -> str:
+        """Parse cookie header and get value by name."""
+        cookie = self.headers.get("Cookie", "")
+        for part in cookie.split(";"):
+            part = part.strip()
+            if part.startswith(f"{name}="):
+                return part[len(name)+1:]
+        return ""
+
+    def _check_admin_auth(self) -> bool:
+        """Check if admin is authenticated via session cookie."""
+        token = self._get_cookie("admin_session")
+        if token and verify_session(token):
+            return True
+        return False
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -95,14 +117,48 @@ class GeminiHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_redirect(self, location: str):
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.end_headers()
+
+    def _set_cookie(self, name: str, value: str, max_age: int = 86400):
+        self.send_header("Set-Cookie", f"{name}={value}; Path=/; HttpOnly; SameSite=Strict; Max-Age={max_age}")
+
+    def _clear_cookie(self, name: str):
+        self.send_header("Set-Cookie", f"{name}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0")
+
     def do_GET(self):
         try:
-            # Admin UI routes (no auth required)
+            # Admin UI routes
             if self.path == "/admin" or self.path == "/admin/":
                 if os.path.exists(_ADMIN_HTML):
                     self._send_html(_ADMIN_HTML)
                 else:
                     self.send_json({"error": "管理后台未找到"}, 404)
+                return
+
+            # Admin API routes
+            if self.path == "/admin/api/status":
+                self.send_json({
+                    "password_set": is_password_set(),
+                    "version": __version__,
+                    "models": list(MODELS.keys())
+                })
+                return
+
+            if self.path == "/admin/api/config":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                self.send_json(get_current_config())
+                return
+
+            if self.path == "/admin/api/cookie":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                self.send_json({"cookie": get_cookie()})
                 return
 
             # API routes (require auth if configured)
@@ -130,11 +186,89 @@ class GeminiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length else b""
+
+            # Admin API: setup password (first time)
+            if self.path == "/admin/api/setup":
+                req = self._parse_body(body)
+                if not req or not req.get("password"):
+                    self.send_json({"error": "密码不能为空"}, 400)
+                    return
+                if is_password_set():
+                    self.send_json({"error": "密码已设置"}, 400)
+                    return
+                set_password(req["password"])
+                token = create_session()
+                self.send_response(200)
+                self._set_cookie("admin_session", token)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True}).encode())
+                return
+
+            # Admin API: login
+            if self.path == "/admin/api/login":
+                req = self._parse_body(body)
+                if not req or not req.get("password"):
+                    self.send_json({"error": "密码不能为空"}, 400)
+                    return
+                if not is_password_set():
+                    self.send_json({"error": "请先设置密码"}, 400)
+                    return
+                if verify_admin_password(req["password"]):
+                    token = create_session()
+                    self.send_response(200)
+                    self._set_cookie("admin_session", token)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": True}).encode())
+                else:
+                    self.send_json({"error": "密码错误"}, 401)
+                return
+
+            # Admin API: logout
+            if self.path == "/admin/api/logout":
+                token = self._get_cookie("admin_session")
+                if token:
+                    clear_session(token)
+                self.send_response(200)
+                self._clear_cookie("admin_session")
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True}).encode())
+                return
+
+            # Admin API: update config
+            if self.path == "/admin/api/config":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                req = self._parse_body(body)
+                if not req:
+                    self.send_json({"error": "无效的请求"}, 400)
+                    return
+                update_config(req)
+                self.send_json({"success": True})
+                return
+
+            # Admin API: save cookie
+            if self.path == "/admin/api/cookie":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                req = self._parse_body(body)
+                if not req or "cookie" not in req:
+                    self.send_json({"error": "Cookie 不能为空"}, 400)
+                    return
+                save_cookie(req["cookie"])
+                self.send_json({"success": True})
+                return
+
+            # OpenAI API routes
             if self.path.startswith("/v1/") and not self._authorized():
                 self.send_json({"error": {"message": "无效的 API 密钥"}}, 401)
                 return
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length) if length else b""
             if self.path == "/v1/chat/completions":
                 self._handle_chat(body)
             elif self.path == "/v1/responses":

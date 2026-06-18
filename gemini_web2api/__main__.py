@@ -9,6 +9,9 @@ from .server import GeminiHandler, ThreadedServer
 from . import __version__
 
 
+from .admin import set_config_file
+
+
 def main():
     parser = argparse.ArgumentParser(description="Gemini 网页转 OpenAI API 服务")
     parser.add_argument("--port", type=int, default=None)
@@ -21,6 +24,7 @@ def main():
     config_path = args.config or os.environ.get("GEMINI_WEB2API_CONFIG") or find_config()
     if config_path:
         load_config(config_path)
+        set_config_file(config_path)
 
     if args.port:
         CONFIG["port"] = args.port
