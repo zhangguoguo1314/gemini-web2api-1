@@ -51,5 +51,7 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           cd /tmp/hf-space
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions Bot"
           git add -A
           git diff --cached --quiet || (git commit -m "自动部署: $(echo ${{ github.sha }} | cut -c1-8)" && git push)
