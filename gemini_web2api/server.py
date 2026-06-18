@@ -207,8 +207,9 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 self.send_json({"cookie": get_cookie()})
                 return
 
-            # API routes (require auth if configured)
-            if self.path.startswith("/v1/") and not self._authorized():
+            # API routes (require auth if configured, but skip if admin session exists)
+            is_admin = bool(self._get_cookie("admin_session"))
+            if self.path.startswith("/v1/") and not self._authorized() and not is_admin:
                 self.send_json({"error": {"message": "无效的 API 密钥"}}, 401)
                 return
             if self.path == "/v1/models":
@@ -338,7 +339,8 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 return
 
             # OpenAI API routes
-            if self.path.startswith("/v1/") and not self._authorized():
+            is_admin = bool(self._get_cookie("admin_session"))
+            if self.path.startswith("/v1/") and not self._authorized() and not is_admin:
                 self.send_json({"error": {"message": "无效的 API 密钥"}}, 401)
                 return
             if self.path == "/v1/chat/completions":
