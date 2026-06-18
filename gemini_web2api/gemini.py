@@ -46,14 +46,24 @@ def _get_httpx_client():
 
 
 def load_cookie() -> tuple:
-    """Load cookie from file with mtime-based caching."""
+    """Load cookie from file with mtime-based caching, or from account pool."""
+    # Try account pool first
+    try:
+        from .account_pool import get_active_cookie
+        cookie_str, sapisid, acc_id = get_active_cookie()
+        if cookie_str:
+            return cookie_str, sapisid, acc_id
+    except Exception:
+        pass
+
+    # Fallback to global config
     cookie_file = CONFIG.get("cookie_file")
     if not cookie_file or not os.path.exists(cookie_file):
-        return "", None
+        return "", None, None
     try:
         mtime = os.path.getmtime(cookie_file)
         if mtime == _cookie_cache["mtime"] and _cookie_cache["str"]:
-            return _cookie_cache["str"], _cookie_cache["sapisid"]
+            return _cookie_cache["str"], _cookie_cache["sapisid"], None
         with open(cookie_file, "r") as f:
             content = f.read().strip()
         if content.startswith("{"):
@@ -65,10 +75,10 @@ def load_cookie() -> tuple:
             pairs = dict(p.split("=", 1) for p in cookie_str.split("; ") if "=" in p)
             sapisid = pairs.get("SAPISID", "")
         _cookie_cache.update({"str": cookie_str, "sapisid": sapisid or None, "mtime": mtime})
-        return cookie_str, sapisid if sapisid else None
+        return _cookie_cache["str"], _cookie_cache["sapisid"], None
     except Exception as e:
         log(f"Cookie 加载失败: {e}")
-        return _cookie_cache["str"], _cookie_cache["sapisid"]
+        return _cookie_cache["str"], _cookie_cache["sapisid"], None
 
 
 def make_sapisidhash(sapisid: str) -> str:
@@ -96,12 +106,12 @@ def _build_headers() -> dict:
     }
     if account_prefix:
         headers["X-Goog-AuthUser"] = str(CONFIG["auth_user"])
-    cookie_str, sapisid = load_cookie()
+    cookie_str, sapisid, acc_id = load_cookie()
     if cookie_str:
         headers["Cookie"] = cookie_str
     if sapisid:
         headers["Authorization"] = make_sapisidhash(sapisid)
-    return headers
+    return headers, acc_id
 
 
 def _build_payload(prompt: str, model_id: int, think_mode: int, file_refs: list = None, extra_fields: dict = None) -> str:
@@ -189,11 +199,11 @@ def extract_response_text(raw: str) -> str:
     return clean_text(last_text)
 
 
-def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None, extra_fields: dict = None) -> str:
-    """Non-streaming generation with retry."""
+def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None, extra_fields: dict = None) -> tuple:
+    """Non-streaming generation with retry. Returns (text, account_id)."""
     body = _build_payload(prompt, model_id, think_mode, file_refs, extra_fields).encode()
     url = _get_url()
-    headers = _build_headers()
+    headers, acc_id = _build_headers()
     ctx = _get_ssl_ctx()
     proxy = CONFIG.get("proxy")
 
@@ -210,7 +220,7 @@ def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None
             else:
                 resp = urllib.request.urlopen(req, context=ctx, timeout=CONFIG["request_timeout_sec"])
             raw = resp.read().decode("utf-8", errors="replace")
-            return extract_response_text(raw)
+            return extract_response_text(raw), acc_id
         except Exception as e:
             last_err = e
             if attempt < CONFIG["retry_attempts"] - 1:
@@ -222,14 +232,14 @@ def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None
 def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list = None, extra_fields: dict = None):
     """Streaming generation via httpx with retry on connection failure."""
     if not HAS_HTTPX:
-        text = generate(prompt, model_id, think_mode, file_refs, extra_fields)
+        text, acc_id = generate(prompt, model_id, think_mode, file_refs, extra_fields)
         if text:
-            yield text
+            yield text, acc_id
         return
 
     body = _build_payload(prompt, model_id, think_mode, file_refs, extra_fields)
     url = _get_url()
-    headers = _build_headers()
+    headers, acc_id = _build_headers()
     client = _get_httpx_client()
 
     last_err = None
@@ -246,7 +256,7 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
                             if len(t) > len(prev_text):
                                 delta = clean_text(t[len(prev_text):])
                                 if delta:
-                                    yield delta
+                                    yield delta, acc_id
                                 prev_text = t
             return
         except Exception as e:

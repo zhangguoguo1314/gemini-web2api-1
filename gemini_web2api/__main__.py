@@ -8,8 +8,8 @@ from .gemini import HAS_HTTPX
 from .server import GeminiHandler, ThreadedServer
 from . import __version__
 
-
 from .admin import set_config_file
+from .account_pool import set_account_file, init_pool_from_cookie
 
 
 def main():
@@ -33,6 +33,12 @@ def main():
     if args.proxy:
         CONFIG["proxy"] = args.proxy
 
+    # Initialize account pool
+    data_dir = os.path.dirname(config_path) if config_path else os.getcwd()
+    account_file = os.path.join(data_dir, "accounts.json")
+    set_account_file(account_file)
+    init_pool_from_cookie()
+
     port = CONFIG["port"]
     server = ThreadedServer((CONFIG["host"], port), GeminiHandler)
     print(f"gemini-web2api v{__version__}")
@@ -40,6 +46,7 @@ def main():
     print(f"  接口地址:  http://localhost:{port}/v1")
     print(f"  可用模型:  {', '.join(MODELS.keys())}")
     print(f"  Cookie:    {'已配置' if CONFIG.get('cookie_file') else '未配置（匿名模式）'}")
+    print(f"  账号池:    {account_file}")
     print(f"  代理:       {CONFIG.get('proxy') or '使用系统环境变量'}")
     print(f"  流式传输:   {'httpx（真流式）' if HAS_HTTPX else 'urllib（缓冲模式）'}")
     print()

@@ -19,10 +19,21 @@ from .admin import (
     set_config_file, get_current_config, update_config,
     save_cookie, get_cookie
 )
+from .account_pool import (
+    set_account_file, get_accounts, add_account, update_account,
+    delete_account, test_account, get_pool_stats, record_request,
+    init_pool_from_cookie
+)
+from .request_logger import (
+    log_request, get_logs, get_stats, get_log_detail
+)
 
 # Admin UI static file path
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 _ADMIN_HTML = os.path.join(_STATIC_DIR, "admin.html")
+
+# Server start time for uptime
+_SERVER_START = time.time()
 
 
 def _usage(prompt: str, text: str) -> dict:
@@ -117,11 +128,6 @@ class GeminiHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_redirect(self, location: str):
-        self.send_response(302)
-        self.send_header("Location", location)
-        self.end_headers()
-
     def _set_cookie(self, name: str, value: str, max_age: int = 86400):
         self.send_header("Set-Cookie", f"{name}={value}; Path=/; HttpOnly; SameSite=Strict; Max-Age={max_age}")
 
@@ -138,7 +144,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
                     self.send_json({"error": "管理后台未找到"}, 404)
                 return
 
-            # Admin API routes
+            # Admin API: status (no auth)
             if self.path == "/admin/api/status":
                 self.send_json({
                     "password_set": is_password_set(),
@@ -147,6 +153,45 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 })
                 return
 
+            # Admin API: stats (requires auth)
+            if self.path == "/admin/api/stats":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                pool_stats = get_pool_stats()
+                req_stats = get_stats()
+                self.send_json({
+                    "uptime": int(time.time() - _SERVER_START),
+                    "pool": pool_stats,
+                    "requests": req_stats,
+                })
+                return
+
+            # Admin API: accounts
+            if self.path == "/admin/api/accounts":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                self.send_json({"accounts": get_accounts()})
+                return
+
+            # Admin API: logs
+            if self.path.startswith("/admin/api/logs"):
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                # Parse query params
+                import urllib.parse
+                parsed = urllib.parse.urlparse(self.path)
+                qs = urllib.parse.parse_qs(parsed.query)
+                limit = int(qs.get("limit", [100])[0])
+                offset = int(qs.get("offset", [0])[0])
+                status_filter = qs.get("status", [None])[0]
+                model_filter = qs.get("model", [None])[0]
+                self.send_json(get_logs(limit, offset, status_filter, model_filter))
+                return
+
+            # Admin API: config
             if self.path == "/admin/api/config":
                 if not self._check_admin_auth():
                     self.send_json({"error": "未登录"}, 401)
@@ -154,6 +199,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 self.send_json(get_current_config())
                 return
 
+            # Admin API: cookie
             if self.path == "/admin/api/cookie":
                 if not self._check_admin_auth():
                     self.send_json({"error": "未登录"}, 401)
@@ -239,6 +285,32 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"success": True}).encode())
                 return
 
+            # Admin API: accounts
+            if self.path == "/admin/api/accounts":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                req = self._parse_body(body)
+                if not req:
+                    self.send_json({"error": "无效的请求"}, 400)
+                    return
+                action = req.get("action")
+                if action == "add":
+                    acc = add_account(req.get("name", ""), req.get("cookie", ""), req.get("weight", 1))
+                    self.send_json({"success": True, "account": acc})
+                elif action == "update":
+                    acc = update_account(req.get("id"), req.get("updates", {}))
+                    self.send_json({"success": True, "account": acc})
+                elif action == "delete":
+                    ok = delete_account(req.get("id"))
+                    self.send_json({"success": ok})
+                elif action == "test":
+                    result = test_account(req.get("id"))
+                    self.send_json(result)
+                else:
+                    self.send_json({"error": "未知操作"}, 400)
+                return
+
             # Admin API: update config
             if self.path == "/admin/api/config":
                 if not self._check_admin_auth():
@@ -291,6 +363,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
     # ─── /v1/chat/completions ─────────────────────────────────────────────────
 
     def _handle_chat(self, body: bytes):
+        start_time = time.time()
         req = self._parse_body(body)
         if req is None:
             self.send_json({"error": {"message": "无效的 JSON 格式"}}, 400)
@@ -310,27 +383,40 @@ class GeminiHandler(BaseHTTPRequestHandler):
 
         stream = req.get("stream", False)
         cid = f"chatcmpl-{uuid.uuid4().hex[:12]}"
+        acc_id = None
 
         if stream and (not tools or tool_choice == "none"):
             try:
                 self._start_sse()
-                for delta in generate_stream(prompt, model_id, think_mode, _upload_images(images), extra_fields):
+                total_tokens = 0
+                for delta, acc_id in generate_stream(prompt, model_id, think_mode, _upload_images(images), extra_fields):
                     chunk = {"id": cid, "object": "chat.completion.chunk", "created": int(time.time()),
                              "model": model_name, "choices": [{"index": 0, "delta": {"content": delta}, "finish_reason": None}]}
                     self.wfile.write(f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n".encode())
                     self.wfile.flush()
+                    total_tokens += len(delta) // 4
                 end = {"id": cid, "object": "chat.completion.chunk", "created": int(time.time()),
                        "model": model_name, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
                 self.wfile.write(f"data: {json.dumps(end)}\n\n".encode())
                 self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
+                duration = int((time.time() - start_time) * 1000)
+                log_request("POST", "/v1/chat/completions", model_name, "success", total_tokens, duration, acc_id)
+                record_request(acc_id, total_tokens)
             except (BrokenPipeError, ConnectionResetError):
                 pass
+            except Exception as e:
+                duration = int((time.time() - start_time) * 1000)
+                log_request("POST", "/v1/chat/completions", model_name, "error", 0, duration, acc_id, str(e))
+                record_request(acc_id, 0, True)
             return
 
         try:
-            text = generate(prompt, model_id, think_mode, _upload_images(images), extra_fields)
+            text, acc_id = generate(prompt, model_id, think_mode, _upload_images(images), extra_fields)
         except Exception as e:
+            duration = int((time.time() - start_time) * 1000)
+            log_request("POST", "/v1/chat/completions", model_name, "error", 0, duration, None, str(e))
+            record_request(acc_id, 0, True)
             self.send_json({"error": {"message": f"上游服务错误: {e}"}}, 502)
             return
 
@@ -341,6 +427,11 @@ class GeminiHandler(BaseHTTPRequestHandler):
         if tool_calls:
             msg["tool_calls"] = tool_calls
         finish = "tool_calls" if tool_calls else "stop"
+        tokens = (len(prompt) + len(text or "")) // 4
+        duration = int((time.time() - start_time) * 1000)
+
+        log_request("POST", "/v1/chat/completions", model_name, "success", tokens, duration, acc_id)
+        record_request(acc_id, tokens)
 
         if stream:
             self._start_sse()
@@ -355,12 +446,13 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 "model": model_name,
                 "choices": [{"index": 0, "message": msg, "finish_reason": finish}],
                 "usage": {"prompt_tokens": len(prompt)//4, "completion_tokens": len(text or "")//4,
-                          "total_tokens": (len(prompt)+len(text or ""))//4},
+                          "total_tokens": tokens},
             })
 
     # ─── /v1/responses (Codex CLI) ───────────────────────────────────────────
 
     def _handle_responses(self, body: bytes):
+        start_time = time.time()
         req = self._parse_body(body)
         if req is None:
             self.send_json({"error": {"message": "无效的 JSON 格式"}}, 400)
@@ -420,8 +512,11 @@ class GeminiHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            text = generate(prompt, model_id, think_mode, _upload_images(images), extra_fields)
+            text, acc_id = generate(prompt, model_id, think_mode, _upload_images(images), extra_fields)
         except Exception as e:
+            duration = int((time.time() - start_time) * 1000)
+            log_request("POST", "/v1/responses", model_name, "error", 0, duration, None, str(e))
+            record_request(None, 0, True)
             self.send_json({"error": {"message": f"上游服务错误: {e}"}}, 502)
             return
 
@@ -439,6 +534,11 @@ class GeminiHandler(BaseHTTPRequestHandler):
         if text or not tool_calls:
             output.append({"type": "message", "id": mid, "role": "assistant", "status": "completed",
                            "content": [{"type": "output_text", "text": text or "", "annotations": []}]})
+
+        tokens = (len(prompt) + len(text or "")) // 4
+        duration = int((time.time() - start_time) * 1000)
+        log_request("POST", "/v1/responses", model_name, "success", tokens, duration, acc_id)
+        record_request(acc_id, tokens)
 
         if req.get("stream"):
             self.send_response(200)
@@ -468,6 +568,7 @@ class GeminiHandler(BaseHTTPRequestHandler):
     # ─── /v1beta/models (Google Gemini CLI) ──────────────────────────────────
 
     def _handle_google_generate(self, body: bytes, stream: bool):
+        start_time = time.time()
         req = self._parse_body(body)
         if req is None:
             self.send_json({"error": {"message": "无效的 JSON 格式"}}, 400)
@@ -494,10 +595,13 @@ class GeminiHandler(BaseHTTPRequestHandler):
             try:
                 self._start_sse()
                 full_text = ""
-                for delta in generate_stream(prompt, model_id, think_mode, file_refs, extra_fields):
+                total_tokens = 0
+                acc_id = None
+                for delta, acc_id in generate_stream(prompt, model_id, think_mode, file_refs, extra_fields):
                     if not delta:
                         continue
                     full_text += delta
+                    total_tokens += len(delta) // 4
                     chunk_obj = {
                         "candidates": [{"content": {"parts": [{"text": delta}], "role": "model"}, "index": 0}],
                         "modelVersion": model_name,
@@ -515,13 +619,23 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 }
                 self.wfile.write(f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n".encode())
                 self.wfile.flush()
+                duration = int((time.time() - start_time) * 1000)
+                log_request("POST", self.path, model_name, "success", total_tokens, duration, acc_id)
+                record_request(acc_id, total_tokens)
             except (BrokenPipeError, ConnectionResetError):
                 pass
+            except Exception as e:
+                duration = int((time.time() - start_time) * 1000)
+                log_request("POST", self.path, model_name, "error", 0, duration, None, str(e))
+                record_request(None, 0, True)
             return
 
         try:
-            text = generate(prompt, model_id, think_mode, file_refs, extra_fields)
+            text, acc_id = generate(prompt, model_id, think_mode, file_refs, extra_fields)
         except Exception as e:
+            duration = int((time.time() - start_time) * 1000)
+            log_request("POST", self.path, model_name, "error", 0, duration, None, str(e))
+            record_request(None, 0, True)
             self.send_json({"error": {"message": f"上游服务错误: {e}"}}, 502)
             return
 
@@ -556,6 +670,11 @@ class GeminiHandler(BaseHTTPRequestHandler):
             "usageMetadata": usage,
             "modelVersion": model_name,
         }
+
+        tokens = (len(prompt) + len(text or "")) // 4
+        duration = int((time.time() - start_time) * 1000)
+        log_request("POST", self.path, model_name, "success", tokens, duration, acc_id)
+        record_request(acc_id, tokens)
 
         if stream:
             self._start_sse()

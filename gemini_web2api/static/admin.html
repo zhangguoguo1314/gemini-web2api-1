@@ -139,6 +139,7 @@ body {
 .nav {
   flex: 1;
   padding: 1rem 0;
+  overflow-y: auto;
 }
 .nav-item {
   display: flex;
@@ -204,7 +205,7 @@ body {
 /* Cards */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -227,6 +228,11 @@ body {
 .card-value.success { color: var(--success); }
 .card-value.warning { color: var(--warning); }
 .card-value.error { color: var(--error); }
+.card-sub {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
 
 /* Tables */
 .table-wrap {
@@ -286,6 +292,15 @@ tr:hover td { background: var(--bg3); }
   border: 1px solid var(--border);
 }
 .btn-secondary:hover { background: var(--border); }
+.btn-success {
+  background: var(--success);
+  color: #fff;
+}
+.btn-success:hover { background: #16a34a; }
+.btn-sm {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+}
 
 /* Forms */
 .form-group {
@@ -340,7 +355,7 @@ tr:hover td { background: var(--bg3); }
   border: 1px solid var(--border);
   border-radius: 12px;
   width: 90%;
-  max-width: 500px;
+  max-width: 560px;
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -410,6 +425,7 @@ tr:hover td { background: var(--bg3); }
 .badge-success { background: rgba(34,197,94,0.15); color: var(--success); }
 .badge-error { background: rgba(239,68,68,0.15); color: var(--error); }
 .badge-warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge-muted { background: rgba(139,143,163,0.15); color: var(--muted); }
 
 /* Chat test area */
 .chat-container {
@@ -491,10 +507,71 @@ tr:hover td { background: var(--bg3); }
   font-weight: 600;
   margin-bottom: 1rem;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 /* Hidden */
 .hidden { display: none !important; }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.pagination button {
+  padding: 0.4rem 0.8rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pagination button:hover { background: var(--border); }
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.pagination .page-info {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.filter-bar select, .filter-bar input {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+
+/* Progress bar */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.3rem;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
 
 /* Mobile */
 @media (max-width: 768px) {
@@ -538,6 +615,18 @@ tr:hover td { background: var(--bg3); }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         仪表盘
       </button>
+      <button class="nav-item" data-page="accounts" onclick="showPage('accounts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        账号池
+      </button>
+      <button class="nav-item" data-page="stats" onclick="showPage('stats')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        数据统计
+      </button>
+      <button class="nav-item" data-page="logs" onclick="showPage('logs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        请求日志
+      </button>
       <button class="nav-item" data-page="chat" onclick="showPage('chat')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         在线测试
@@ -568,18 +657,30 @@ tr:hover td { background: var(--bg3); }
         <div class="card">
           <div class="card-label">服务状态</div>
           <div class="card-value success" id="status-text">运行中</div>
+          <div class="card-sub" id="uptime-text">运行时间: --</div>
         </div>
         <div class="card">
           <div class="card-label">可用模型</div>
           <div class="card-value" id="model-count">--</div>
         </div>
         <div class="card">
-          <div class="card-label">版本</div>
-          <div class="card-value" id="version-card">--</div>
+          <div class="card-label">账号池</div>
+          <div class="card-value" id="account-count">--</div>
+          <div class="card-sub" id="account-active">活跃: --</div>
         </div>
         <div class="card">
-          <div class="card-label">Cookie 状态</div>
-          <div class="card-value" id="cookie-status">--</div>
+          <div class="card-label">今日请求</div>
+          <div class="card-value" id="today-requests">--</div>
+          <div class="card-sub" id="today-tokens">Token: --</div>
+        </div>
+        <div class="card">
+          <div class="card-label">总请求数</div>
+          <div class="card-value" id="total-requests">--</div>
+          <div class="card-sub" id="total-errors">错误: --</div>
+        </div>
+        <div class="card">
+          <div class="card-label">总 Token</div>
+          <div class="card-value" id="total-tokens">--</div>
         </div>
       </div>
 
@@ -599,6 +700,133 @@ tr:hover td { background: var(--bg3); }
       <div class="section">
         <h3 class="section-title">快速配置</h3>
         <div class="code-block" id="quick-config">加载中...</div>
+      </div>
+    </div>
+
+    <!-- Accounts Page -->
+    <div id="page-accounts" class="page hidden">
+      <h2 class="page-title">账号池管理</h2>
+      <div class="section">
+        <div class="section-title">
+          <span>账号列表</span>
+          <button class="btn btn-primary" onclick="openAccountModal()">+ 添加账号</button>
+        </div>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">
+          系统会按权重随机选择账号发送请求，实现负载均衡。账号异常时会自动分摊到其他账号。
+        </p>
+        <div class="table-wrap">
+          <table id="accounts-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>状态</th>
+                <th>权重</th>
+                <th>请求数</th>
+                <th>Token</th>
+                <th>错误</th>
+                <th>最后使用</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Page -->
+    <div id="page-stats" class="page hidden">
+      <h2 class="page-title">数据统计</h2>
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-label">运行时间</div>
+          <div class="card-value" id="stat-uptime">--</div>
+        </div>
+        <div class="card">
+          <div class="card-label">总请求数</div>
+          <div class="card-value" id="stat-total-req">--</div>
+        </div>
+        <div class="card">
+          <div class="card-label">总 Token</div>
+          <div class="card-value" id="stat-total-tok">--</div>
+        </div>
+        <div class="card">
+          <div class="card-label">错误数</div>
+          <div class="card-value error" id="stat-errors">--</div>
+        </div>
+        <div class="card">
+          <div class="card-label">成功率</div>
+          <div class="card-value success" id="stat-success-rate">--</div>
+        </div>
+        <div class="card">
+          <div class="card-label">活跃账号</div>
+          <div class="card-value" id="stat-active-acc">--</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3 class="section-title">模型使用分布</h3>
+        <div class="table-wrap">
+          <table id="model-stats-table">
+            <thead>
+              <tr><th>模型</th><th>请求数</th><th>Token</th><th>占比</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3 class="section-title">账号负载分布</h3>
+        <div class="table-wrap">
+          <table id="account-stats-table">
+            <thead>
+              <tr><th>账号</th><th>请求数</th><th>Token</th><th>错误</th><th>占比</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Page -->
+    <div id="page-logs" class="page hidden">
+      <h2 class="page-title">请求日志</h2>
+      <div class="section">
+        <div class="filter-bar">
+          <select id="log-status-filter" onchange="loadLogs(0)">
+            <option value="">全部状态</option>
+            <option value="success">成功</option>
+            <option value="error">错误</option>
+          </select>
+          <select id="log-model-filter" onchange="loadLogs(0)">
+            <option value="">全部模型</option>
+          </select>
+          <input type="text" id="log-search" placeholder="搜索路径..." onkeydown="if(event.key==='Enter')loadLogs(0)">
+          <button class="btn btn-secondary btn-sm" onclick="loadLogs(0)">刷新</button>
+        </div>
+        <div class="table-wrap">
+          <table id="logs-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>方法</th>
+                <th>路径</th>
+                <th>模型</th>
+                <th>状态</th>
+                <th>Token</th>
+                <th>耗时</th>
+                <th>账号</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button onclick="prevPage()" id="btn-prev">上一页</button>
+          <span class="page-info" id="page-info">第 1 页</span>
+          <button onclick="nextPage()" id="btn-next">下一页</button>
+        </div>
       </div>
     </div>
 
@@ -690,6 +918,42 @@ sk-yyyy" rows="4"></textarea>
   </main>
 </div>
 
+<!-- Account Modal -->
+<div id="account-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">添加账号</h3>
+      <button class="modal-close" onclick="closeAccountModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="acc-id">
+      <div class="form-group">
+        <label>账号名称</label>
+        <input type="text" id="acc-name" placeholder="例如：账号1">
+      </div>
+      <div class="form-group">
+        <label>Cookie</label>
+        <textarea id="acc-cookie" placeholder="SID=xxx; HSID=xxx; SSID=xxx; APISID=xxx; SAPISID=xxx" rows="4"></textarea>
+        <p class="help">从浏览器开发者工具复制完整的 Cookie 字符串。</p>
+      </div>
+      <div class="form-group">
+        <label>权重</label>
+        <input type="number" id="acc-weight" value="1" min="1" max="100">
+        <p class="help">权重越高，被选中的概率越大。建议所有账号权重相同实现均匀分摊。</p>
+      </div>
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="acc-enabled" checked> 启用
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeAccountModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveAccount()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -697,6 +961,10 @@ sk-yyyy" rows="4"></textarea>
 // State
 let isFirstSetup = false;
 let currentPage = 'dashboard';
+let logOffset = 0;
+let logLimit = 20;
+let logHasMore = false;
+let accountsData = [];
 
 // API client
 const API_BASE = '';
@@ -807,6 +1075,7 @@ function enterApp() {
   document.getElementById('app').classList.remove('hidden');
   loadDashboard();
   loadConfig();
+  startAutoRefresh();
 }
 
 // Navigation
@@ -818,6 +1087,46 @@ function showPage(page) {
   currentPage = page;
   if (page === 'models') loadModels();
   if (page === 'config') loadConfig();
+  if (page === 'accounts') loadAccounts();
+  if (page === 'stats') loadStats();
+  if (page === 'logs') loadLogs(0);
+}
+
+// Auto refresh dashboard & stats
+let refreshInterval;
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => {
+    if (currentPage === 'dashboard') loadDashboard();
+    if (currentPage === 'stats') loadStats();
+    if (currentPage === 'accounts') loadAccounts();
+  }, 5000);
+}
+
+// Format duration
+function formatDuration(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (d > 0) return `${d}天${h}小时`;
+  if (h > 0) return `${h}小时${m}分`;
+  return `${m}分${s}秒`;
+}
+
+function formatTime(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts * 1000);
+  return d.toLocaleString('zh-CN');
+}
+
+function timeAgo(ts) {
+  if (!ts) return '-';
+  const diff = Math.floor(Date.now() / 1000) - ts;
+  if (diff < 60) return diff + '秒前';
+  if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+  if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+  return Math.floor(diff / 86400) + '天前';
 }
 
 // Load dashboard data
@@ -825,26 +1134,25 @@ async function loadDashboard() {
   try {
     const info = await apiGet('/');
     document.getElementById('version').textContent = info.version || '--';
-    document.getElementById('version-card').textContent = info.version || '--';
     document.getElementById('model-count').textContent = (info.models || []).length;
     document.getElementById('status-text').textContent = '运行中';
 
     const baseUrl = window.location.origin;
     document.getElementById('api-v1').textContent = baseUrl + '/v1/chat/completions';
 
-    // Check cookie status
+    // Stats
     try {
-      const cookieData = await apiGet('/admin/api/cookie');
-      if (cookieData.cookie) {
-        document.getElementById('cookie-status').textContent = '已配置';
-        document.getElementById('cookie-status').className = 'card-value success';
-      } else {
-        document.getElementById('cookie-status').textContent = '未配置';
-        document.getElementById('cookie-status').className = 'card-value warning';
-      }
+      const stats = await apiGet('/admin/api/stats');
+      document.getElementById('uptime-text').textContent = '运行时间: ' + formatDuration(stats.uptime || 0);
+      document.getElementById('account-count').textContent = stats.pool?.total_accounts || 0;
+      document.getElementById('account-active').textContent = '活跃: ' + (stats.pool?.active_accounts || 0);
+      document.getElementById('today-requests').textContent = stats.requests?.today?.requests || 0;
+      document.getElementById('today-tokens').textContent = 'Token: ' + (stats.requests?.today?.tokens || 0);
+      document.getElementById('total-requests').textContent = stats.pool?.total_requests || 0;
+      document.getElementById('total-errors').textContent = '错误: ' + (stats.pool?.total_errors || 0);
+      document.getElementById('total-tokens').textContent = stats.pool?.total_tokens || 0;
     } catch (e) {
-      document.getElementById('cookie-status').textContent = '未配置';
-      document.getElementById('cookie-status').className = 'card-value warning';
+      // ignore
     }
 
     // Quick config
@@ -856,8 +1164,261 @@ async function loadDashboard() {
   } catch (e) {
     document.getElementById('status-text').textContent = '异常';
     document.getElementById('status-text').className = 'card-value error';
-    toast('连接服务器失败: ' + e.message, 'error');
   }
+}
+
+// Load accounts
+async function loadAccounts() {
+  try {
+    const data = await apiGet('/admin/api/accounts');
+    accountsData = data.accounts || [];
+    const tbody = document.querySelector('#accounts-table tbody');
+    tbody.innerHTML = '';
+    
+    if (accountsData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted)">暂无账号，请添加</td></tr>';
+      return;
+    }
+    
+    accountsData.forEach(acc => {
+      const stats = acc.stats || {};
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${escapeHtml(acc.name || '-')}</td>
+        <td>${acc.enabled !== false ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-muted">禁用</span>'}</td>
+        <td>${acc.weight || 1}</td>
+        <td>${stats.requests || 0}</td>
+        <td>${stats.tokens || 0}</td>
+        <td>${stats.errors || 0}</td>
+        <td>${timeAgo(stats.last_used)}</td>
+        <td>
+          <button class="btn btn-success btn-sm" onclick="testAccount('${acc.id}')">测试</button>
+          <button class="btn btn-secondary btn-sm" onclick="editAccount('${acc.id}')">编辑</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAccount('${acc.id}')">删除</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (e) {
+    toast('加载账号失败: ' + e.message, 'error');
+  }
+}
+
+// Account modal
+function openAccountModal(id) {
+  document.getElementById('account-modal').classList.remove('hidden');
+  if (id) {
+    const acc = accountsData.find(a => a.id === id);
+    if (!acc) return;
+    document.getElementById('modal-title').textContent = '编辑账号';
+    document.getElementById('acc-id').value = acc.id;
+    document.getElementById('acc-name').value = acc.name || '';
+    document.getElementById('acc-cookie').value = acc.cookie || '';
+    document.getElementById('acc-weight').value = acc.weight || 1;
+    document.getElementById('acc-enabled').checked = acc.enabled !== false;
+  } else {
+    document.getElementById('modal-title').textContent = '添加账号';
+    document.getElementById('acc-id').value = '';
+    document.getElementById('acc-name').value = '';
+    document.getElementById('acc-cookie').value = '';
+    document.getElementById('acc-weight').value = 1;
+    document.getElementById('acc-enabled').checked = true;
+  }
+}
+
+function closeAccountModal() {
+  document.getElementById('account-modal').classList.add('hidden');
+}
+
+async function saveAccount() {
+  const id = document.getElementById('acc-id').value;
+  const name = document.getElementById('acc-name').value.trim();
+  const cookie = document.getElementById('acc-cookie').value.trim();
+  const weight = parseInt(document.getElementById('acc-weight').value) || 1;
+  const enabled = document.getElementById('acc-enabled').checked;
+  
+  if (!name) { toast('请输入账号名称', 'error'); return; }
+  if (!cookie) { toast('请输入 Cookie', 'error'); return; }
+  
+  try {
+    if (id) {
+      await apiPost('/admin/api/accounts', {
+        action: 'update',
+        id: id,
+        updates: { name, cookie, weight, enabled }
+      });
+      toast('账号已更新', 'success');
+    } else {
+      await apiPost('/admin/api/accounts', {
+        action: 'add',
+        name, cookie, weight
+      });
+      toast('账号已添加', 'success');
+    }
+    closeAccountModal();
+    loadAccounts();
+    loadDashboard();
+  } catch (e) {
+    toast('保存失败: ' + e.message, 'error');
+  }
+}
+
+async function testAccount(id) {
+  toast('正在测试账号...', 'info');
+  try {
+    const res = await apiPost('/admin/api/accounts', { action: 'test', id });
+    if (res.success) {
+      toast('测试通过: ' + (res.message || 'OK'), 'success');
+    } else {
+      toast('测试失败: ' + (res.error || '未知错误'), 'error');
+    }
+  } catch (e) {
+    toast('测试失败: ' + e.message, 'error');
+  }
+}
+
+async function deleteAccount(id) {
+  if (!confirm('确定删除此账号？')) return;
+  try {
+    await apiPost('/admin/api/accounts', { action: 'delete', id });
+    toast('账号已删除', 'success');
+    loadAccounts();
+    loadDashboard();
+  } catch (e) {
+    toast('删除失败: ' + e.message, 'error');
+  }
+}
+
+function editAccount(id) {
+  openAccountModal(id);
+}
+
+// Load stats
+async function loadStats() {
+  try {
+    const stats = await apiGet('/admin/api/stats');
+    document.getElementById('stat-uptime').textContent = formatDuration(stats.uptime || 0);
+    document.getElementById('stat-total-req').textContent = stats.pool?.total_requests || 0;
+    document.getElementById('stat-total-tok').textContent = stats.pool?.total_tokens || 0;
+    document.getElementById('stat-errors').textContent = stats.pool?.total_errors || 0;
+    document.getElementById('stat-active-acc').textContent = (stats.pool?.active_accounts || 0) + ' / ' + (stats.pool?.total_accounts || 0);
+    
+    const total = (stats.pool?.total_requests || 0);
+    const errors = (stats.pool?.total_errors || 0);
+    const rate = total > 0 ? ((total - errors) / total * 100).toFixed(1) + '%' : '100%';
+    document.getElementById('stat-success-rate').textContent = rate;
+    
+    // Model stats
+    const modelStats = stats.requests?.models || {};
+    const modelTbody = document.querySelector('#model-stats-table tbody');
+    modelTbody.innerHTML = '';
+    const modelEntries = Object.entries(modelStats).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
+    const modelTotal = modelEntries.reduce((s, [,v]) => s + (v.requests || 0), 0);
+    modelEntries.forEach(([name, data]) => {
+      const pct = modelTotal > 0 ? ((data.requests || 0) / modelTotal * 100).toFixed(1) : 0;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><code>${escapeHtml(name)}</code></td>
+        <td>${data.requests || 0}</td>
+        <td>${data.tokens || 0}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <span style="min-width:40px">${pct}%</span>
+            <div class="progress-bar" style="flex:1"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+          </div>
+        </td>
+      `;
+      modelTbody.appendChild(row);
+    });
+    if (modelEntries.length === 0) {
+      modelTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">暂无数据</td></tr>';
+    }
+    
+    // Account stats
+    const accTbody = document.querySelector('#account-stats-table tbody');
+    accTbody.innerHTML = '';
+    const accEntries = (accountsData || []).map(acc => {
+      const s = acc.stats || {};
+      return { name: acc.name, requests: s.requests || 0, tokens: s.tokens || 0, errors: s.errors || 0 };
+    }).sort((a, b) => b.requests - a.requests);
+    const accTotal = accEntries.reduce((s, a) => s + a.requests, 0);
+    accEntries.forEach(acc => {
+      const pct = accTotal > 0 ? (acc.requests / accTotal * 100).toFixed(1) : 0;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${escapeHtml(acc.name)}</td>
+        <td>${acc.requests}</td>
+        <td>${acc.tokens}</td>
+        <td>${acc.errors}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <span style="min-width:40px">${pct}%</span>
+            <div class="progress-bar" style="flex:1"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+          </div>
+        </td>
+      `;
+      accTbody.appendChild(row);
+    });
+    if (accEntries.length === 0) {
+      accTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">暂无数据</td></tr>';
+    }
+  } catch (e) {
+    toast('加载统计失败: ' + e.message, 'error');
+  }
+}
+
+// Load logs
+async function loadLogs(offset) {
+  logOffset = offset;
+  const status = document.getElementById('log-status-filter').value;
+  const model = document.getElementById('log-model-filter').value;
+  try {
+    let url = `/admin/api/logs?limit=${logLimit}&offset=${offset}`;
+    if (status) url += `&status=${encodeURIComponent(status)}`;
+    if (model) url += `&model=${encodeURIComponent(model)}`;
+    const data = await apiGet(url);
+    const logs = data.logs || [];
+    logHasMore = data.has_more || false;
+    
+    const tbody = document.querySelector('#logs-table tbody');
+    tbody.innerHTML = '';
+    
+    if (logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted)">暂无日志</td></tr>';
+    } else {
+      logs.forEach(log => {
+        const row = document.createElement('tr');
+        const statusBadge = log.status === 'success' 
+          ? '<span class="badge badge-success">成功</span>' 
+          : '<span class="badge badge-error">错误</span>';
+        row.innerHTML = `
+          <td>${formatTime(log.timestamp)}</td>
+          <td>${log.method}</td>
+          <td><code>${escapeHtml(log.path)}</code></td>
+          <td><code>${escapeHtml(log.model || '-')}</code></td>
+          <td>${statusBadge}</td>
+          <td>${log.tokens || 0}</td>
+          <td>${log.duration_ms || 0}ms</td>
+          <td><code>${escapeHtml(log.account_id || '-')}</code></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+    
+    document.getElementById('page-info').textContent = `第 ${Math.floor(offset / logLimit) + 1} 页`;
+    document.getElementById('btn-prev').disabled = offset <= 0;
+    document.getElementById('btn-next').disabled = !logHasMore;
+  } catch (e) {
+    toast('加载日志失败: ' + e.message, 'error');
+  }
+}
+
+function prevPage() {
+  if (logOffset >= logLimit) loadLogs(logOffset - logLimit);
+}
+
+function nextPage() {
+  if (logHasMore) loadLogs(logOffset + logLimit);
 }
 
 // Load models
