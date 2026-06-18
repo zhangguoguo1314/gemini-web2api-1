@@ -43,6 +43,7 @@ def log_request(method: str, path: str, model: str = None, status: str = "succes
 
     # Update daily stats
     with _stats_lock:
+        global _daily_stats
         today = time.strftime("%Y-%m-%d")
         if _daily_stats["date"] != today:
             _daily_stats = {"date": today, "requests": 0, "tokens": 0, "errors": 0}
