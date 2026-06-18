@@ -20,7 +20,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git clone "https://zhangguoguo1314:${HF_TOKEN}@huggingface.co/spaces/zhangguoguo1314/gemini-web2api" /tmp/hf-space 2>&1 || \
+          git clone "https://youqisi:${HF_TOKEN}@huggingface.co/spaces/youqisi/gemini-web2api" /tmp/hf-space 2>&1 || \
           echo "Space 尚未创建，将跳过部署。请先在 HF 上创建名为 gemini-web2api 的 Docker Space。"
 
       - name: 检查 Space 是否存在
