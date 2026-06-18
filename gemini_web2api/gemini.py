@@ -189,8 +189,22 @@ def _extract_texts_from_line(line: str) -> list:
         return []
 
 
+def _check_bard_error(raw: str):
+    """Check if Gemini returned BardErrorInfo and raise clear error."""
+    bard_err = re.search(r'BardErrorInfo\s*\[(\d+)\]', raw)
+    if bard_err:
+        code = bard_err.group(1)
+        msg = f"Gemini 上游拒绝请求: BardErrorInfo [{code}]"
+        if code == "1060":
+            msg += " - 当前 IP 被 Google 风控，请配置 Cookie 或更换代理"
+        elif code == "1002":
+            msg += " - Cookie 无效或已过期，请重新获取"
+        raise RuntimeError(msg)
+
+
 def extract_response_text(raw: str) -> str:
     """Parse full response to get final text."""
+    _check_bard_error(raw)
     last_text = ""
     for line in raw.split("\n"):
         for t in _extract_texts_from_line(line):
@@ -250,6 +264,8 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
                 buf = ""
                 for chunk in resp.iter_text():
                     buf += chunk
+                    if "BardErrorInfo" in buf:
+                        _check_bard_error(buf)
                     while "\n" in buf:
                         line, buf = buf.split("\n", 1)
                         for t in _extract_texts_from_line(line):
