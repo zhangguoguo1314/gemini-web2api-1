@@ -3,6 +3,7 @@ import json
 import time
 import uuid
 import re
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -12,6 +13,10 @@ from .gemini import generate, generate_stream, log
 from .tools import messages_to_prompt, parse_tool_calls, google_contents_to_prompt, parse_google_function_calls
 from .multimodal import upload_image, fetch_image_bytes
 from . import __version__
+
+# Admin UI static file path
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+_ADMIN_HTML = os.path.join(_STATIC_DIR, "admin.html")
 
 
 def _usage(prompt: str, text: str) -> dict:
@@ -81,8 +86,26 @@ class GeminiHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "*")
         self.end_headers()
 
+    def _send_html(self, path: str, status=200):
+        with open(path, 'rb') as f:
+            body = f.read()
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         try:
+            # Admin UI routes (no auth required)
+            if self.path == "/admin" or self.path == "/admin/":
+                if os.path.exists(_ADMIN_HTML):
+                    self._send_html(_ADMIN_HTML)
+                else:
+                    self.send_json({"error": "管理后台未找到"}, 404)
+                return
+
+            # API routes (require auth if configured)
             if self.path.startswith("/v1/") and not self._authorized():
                 self.send_json({"error": {"message": "无效的 API 密钥"}}, 401)
                 return

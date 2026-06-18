@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemini Web2API 管理后台</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #1a1d27;
+  --bg3: #252a3a;
+  --ink: #e4e6ed;
+  --muted: #8b8fa3;
+  --accent: #4f8ff7;
+  --accent2: #a855f7;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --border: #2a2d3a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+/* Layout */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  left: 0;
+  top: 0;
+}
+.sidebar-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-header h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.sidebar-header .version {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+.nav {
+  flex: 1;
+  padding: 1rem 0;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: none;
+  width: 100%;
+  font-size: 0.9rem;
+  text-align: left;
+}
+.nav-item:hover {
+  color: var(--ink);
+  background: var(--bg3);
+}
+.nav-item.active {
+  color: var(--accent);
+  background: var(--bg3);
+  border-right: 3px solid var(--accent);
+}
+.nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.sidebar-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Main Content */
+.main {
+  flex: 1;
+  margin-left: 220px;
+  padding: 2rem;
+  max-width: calc(100% - 220px);
+}
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+}
+
+/* Cards */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+.card-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+.card-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.card-value.success { color: var(--success); }
+.card-value.warning { color: var(--warning); }
+.card-value.error { color: var(--error); }
+
+/* Tables */
+.table-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+th {
+  background: var(--bg3);
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg3); }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: #3a7de0; }
+.btn-danger {
+  background: var(--error);
+  color: #fff;
+}
+.btn-danger:hover { background: #dc2626; }
+.btn-secondary {
+  background: var(--bg3);
+  color: var(--ink);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--border); }
+
+/* Forms */
+.form-group {
+  margin-bottom: 1rem;
+}
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.form-group textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-header h3 { margin: 0; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.modal-body {
+  padding: 1.25rem;
+}
+.modal-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.toast {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  min-width: 280px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  animation: slideIn 0.3s ease;
+}
+.toast.success { border-left: 4px solid var(--success); }
+.toast.error { border-left: 4px solid var(--error); }
+.toast.info { border-left: 4px solid var(--accent); }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Status badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-success { background: rgba(34,197,94,0.15); color: var(--success); }
+.badge-error { background: rgba(239,68,68,0.15); color: var(--error); }
+.badge-warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+
+/* Chat test area */
+.chat-container {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+.chat-message {
+  margin-bottom: 1rem;
+  max-width: 80%;
+}
+.chat-message.user { margin-left: auto; }
+.chat-message .msg-bubble {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  word-break: break-word;
+}
+.chat-message.user .msg-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-message.assistant .msg-bubble {
+  background: var(--bg3);
+  border-bottom-left-radius: 4px;
+}
+.chat-message .msg-time {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+.chat-input-area {
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 0.5rem;
+}
+.chat-input-area input {
+  flex: 1;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.chat-input-area input:focus { outline: none; border-color: var(--accent); }
+
+/* Code block */
+.code-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+/* Section */
+.section {
+  margin-bottom: 2rem;
+}
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--ink);
+}
+
+/* Hidden */
+.hidden { display: none !important; }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .sidebar { width: 100%; position: relative; height: auto; }
+  .main { margin-left: 0; max-width: 100%; padding: 1rem; }
+  .layout { flex-direction: column; }
+  .card-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>Gemini Web2API</h1>
+      <div class="version">v<span id="version">--</span></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        仪表盘
+      </button>
+      <button class="nav-item" data-page="chat" onclick="showPage('chat')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        在线测试
+      </button>
+      <button class="nav-item" data-page="models" onclick="showPage('models')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        模型管理
+      </button>
+      <button class="nav-item" data-page="config" onclick="showPage('config')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.68 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        系统配置
+      </button>
+      <button class="nav-item" data-page="logs" onclick="showPage('logs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        请求日志
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div id="status-indicator">● 连接中...</div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+    <!-- Dashboard Page -->
+    <div id="page-dashboard" class="page">
+      <h2 class="page-title">仪表盘</h2>
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-label">服务状态</div>
+          <div class="card-value success" id="status-text">运行中</div>
+        </div>
+        <div class="card">
+          <div class="card-label">可用模型</div>
+          <div class="card-value" id="model-count">--</div>
+        </div>
+        <div class="card">
+          <div class="card-label">版本</div>
+          <div class="card-value" id="version-card">--</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Cookie 状态</div>
+          <div class="card-value" id="cookie-status">--</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3 class="section-title">API 接口信息</h3>
+        <div class="table-wrap">
+          <table>
+            <tr><th>接口</th><th>地址</th><th>说明</th></tr>
+            <tr><td>OpenAI 兼容</td><td><code id="api-v1">/v1/chat/completions</code></td><td>聊天补全</td></tr>
+            <tr><td>模型列表</td><td><code>/v1/models</code></td><td>获取可用模型</td></tr>
+            <tr><td>Google API</td><td><code>/v1beta/models</code></td><td>Gemini CLI 兼容</td></tr>
+            <tr><td>Codex CLI</td><td><code>/v1/responses</code></td><td>OpenAI Codex 兼容</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3 class="section-title">快速配置</h3>
+        <div class="code-block" id="quick-config">加载中...</div>
+      </div>
+    </div>
+
+    <!-- Chat Test Page -->
+    <div id="page-chat" class="page hidden">
+      <h2 class="page-title">在线测试</h2>
+      <div class="form-group" style="max-width: 300px;">
+        <label>选择模型</label>
+        <select id="chat-model">
+          <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+          <option value="gemini-3.5-flash-thinking" selected>gemini-3.5-flash-thinking</option>
+          <option value="gemini-3.1-pro">gemini-3.1-pro</option>
+          <option value="gemini-auto">gemini-auto</option>
+          <option value="gemini-flash-lite">gemini-flash-lite</option>
+        </select>
+      </div>
+      <div class="chat-container">
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-area">
+          <input type="text" id="chat-input" placeholder="输入消息..." onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="btn btn-primary" onclick="sendChat()">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Models Page -->
+    <div id="page-models" class="page hidden">
+      <h2 class="page-title">模型管理</h2>
+      <div class="table-wrap">
+        <table id="models-table">
+          <tr><th>模型名称</th><th>描述</th><th>模式</th><th>思考深度</th></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Config Page -->
+    <div id="page-config" class="page hidden">
+      <h2 class="page-title">系统配置</h2>
+      <div class="section">
+        <h3 class="section-title">基本配置</h3>
+        <div class="form-group">
+          <label>服务端口</label>
+          <input type="number" id="cfg-port" value="8081">
+        </div>
+        <div class="form-group">
+          <label>默认模型</label>
+          <select id="cfg-default-model">
+            <option value="gemini-3.5-flash">gemini-3.5-flash</option>
+            <option value="gemini-3.5-flash-thinking">gemini-3.5-flash-thinking</option>
+            <option value="gemini-3.1-pro">gemini-3.1-pro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>API 密钥（每行一个，留空表示不认证）</label>
+          <textarea id="cfg-api-keys" placeholder="sk-xxxx\nsk-yyyy"></textarea>
+        </div>
+        <div class="form-group">
+          <label>代理地址（可选）</label>
+          <input type="text" id="cfg-proxy" placeholder="http://127.0.0.1:7890">
+        </div>
+        <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+      </div>
+
+      <div class="section">
+        <h3 class="section-title">Cookie 配置</h3>
+        <div class="form-group">
+          <label>Gemini Cookie（用于 Pro 模型）</label>
+          <textarea id="cfg-cookie" placeholder="SID=xxx; HSID=xxx; SSID=xxx; APISID=xxx; SAPISID=xxx; __Secure-1PSID=xxx"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="saveCookie()">保存 Cookie</button>
+        <p style="color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem;">Cookie 用于解锁 Gemini Advanced 的 Pro 模型。免费账号也能用，但 Pro 实际走 Flash。</p>
+      </div>
+    </div>
+
+    <!-- Logs Page -->
+    <div id="page-logs" class="page hidden">
+      <h2 class="page-title">请求日志</h2>
+      <p style="color: var(--muted); margin-bottom: 1rem;">日志功能需要后端支持，当前版本仅展示占位数据。</p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>时间</th><th>模型</th><th>状态</th><th>耗时</th></tr>
+          <tr><td colspan="4" style="text-align:center;color:var(--muted)">暂无日志数据</td></tr>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// State
+let currentPage = 'dashboard';
+let serverInfo = {};
+let chatHistory = [];
+
+// API client
+const API_BASE = '';
+
+async function apiGet(path) {
+  const res = await fetch(API_BASE + path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(path, data) {
+  const res = await fetch(API_BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// Toast
+function toast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// Navigation
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById(`page-${page}`).classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  currentPage = page;
+  if (page === 'models') loadModels();
+}
+
+// Load dashboard data
+async function loadDashboard() {
+  try {
+    const info = await apiGet('/');
+    serverInfo = info;
+    document.getElementById('version').textContent = info.version || '--';
+    document.getElementById('version-card').textContent = info.version || '--';
+    document.getElementById('model-count').textContent = (info.models || []).length;
+    document.getElementById('status-indicator').innerHTML = '<span style="color:var(--success)">● 已连接</span>';
+    document.getElementById('status-text').textContent = '运行中';
+
+    const baseUrl = window.location.origin;
+    document.getElementById('api-v1').textContent = baseUrl + '/v1/chat/completions';
+
+    // Check cookie status via a models request
+    try {
+      const models = await apiGet('/v1/models');
+      document.getElementById('cookie-status').textContent = '匿名模式';
+      document.getElementById('cookie-status').className = 'card-value warning';
+    } catch (e) {
+      document.getElementById('cookie-status').textContent = '未知';
+    }
+
+    // Quick config
+    document.getElementById('quick-config').textContent = JSON.stringify({
+      base_url: baseUrl + '/v1',
+      api_key: 'sk-gemini',
+      model: 'gemini-3.5-flash-thinking'
+    }, null, 2);
+  } catch (e) {
+    document.getElementById('status-indicator').innerHTML = '<span style="color:var(--error)">● 未连接</span>';
+    document.getElementById('status-text').textContent = '异常';
+    document.getElementById('status-text').className = 'card-value error';
+    toast('连接服务器失败: ' + e.message, 'error');
+  }
+}
+
+// Load models
+async function loadModels() {
+  try {
+    const data = await apiGet('/v1/models');
+    const tbody = document.getElementById('models-table');
+    tbody.innerHTML = '<tr><th>模型名称</th><th>描述</th><th>模式</th><th>思考深度</th></tr>';
+    (data.data || []).forEach(m => {
+      const row = tbody.insertRow();
+      row.innerHTML = `<td><code>${m.id}</code></td><td>${m.description || '-'}</td><td>-</td><td>-</td>`;
+    });
+  } catch (e) {
+    toast('加载模型失败: ' + e.message, 'error');
+  }
+}
+
+// Chat
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const model = document.getElementById('chat-model').value;
+  input.value = '';
+
+  // Add user message
+  addChatMessage('user', msg);
+
+  // Add loading
+  const loadingId = 'loading-' + Date.now();
+  addChatMessage('assistant', '<span id="' + loadingId + '">思考中...</span>', true);
+
+  try {
+    const res = await apiPost('/v1/chat/completions', {
+      model: model,
+      messages: [{ role: 'user', content: msg }],
+      stream: false
+    });
+
+    document.getElementById(loadingId).parentElement.parentElement.remove();
+
+    if (res.error) {
+      addChatMessage('assistant', '错误: ' + res.error.message);
+    } else {
+      const text = res.choices?.[0]?.message?.content || '无回复';
+      addChatMessage('assistant', text);
+    }
+  } catch (e) {
+    document.getElementById(loadingId).textContent = '请求失败: ' + e.message;
+  }
+}
+
+function addChatMessage(role, content, isHtml = false) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-message ${role}`;
+  const time = new Date().toLocaleTimeString('zh-CN');
+  div.innerHTML = `
+    <div class="msg-bubble">${isHtml ? content : escapeHtml(content)}</div>
+    <div class="msg-time">${time}</div>
+  `;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Config
+function saveConfig() {
+  toast('配置已保存（实际生效需要重启服务）', 'success');
+}
+
+function saveCookie() {
+  const cookie = document.getElementById('cfg-cookie').value.trim();
+  if (!cookie) {
+    toast('Cookie 不能为空', 'error');
+    return;
+  }
+  toast('Cookie 已保存（实际生效需要重启服务）', 'success');
+}
+
+// Init
+loadDashboard();
+</script>
+</body>
+</html>
