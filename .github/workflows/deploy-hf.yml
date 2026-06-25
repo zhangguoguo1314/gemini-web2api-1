@@ -1,4 +1,4 @@
-name: 部署到 Hugging Face Spaces
+name: Deploy to HuggingFace Spaces
 
 on:
   push:
@@ -6,52 +6,37 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-hf:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: 配置 Git
-        run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "actions@github.com"
+      - name: 安装 huggingface_hub
+        run: pip install huggingface_hub --break-system-packages
 
-      - name: 克隆 HF Space 仓库
+      - name: 推送到 HuggingFace Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git clone "https://youqisi:${HF_TOKEN}@huggingface.co/spaces/youqisi/gemini-web2api" /tmp/hf-space 2>&1 || \
-          echo "Space 尚未创建，将跳过部署。请先在 HF 上创建名为 gemini-web2api 的 Docker Space。"
+          python3 << 'EOF'
+          from huggingface_hub import HfApi
+          import os, shutil
 
-      - name: 检查 Space 是否存在
-        id: check_space
-        run: |
-          if [ -d "/tmp/hf-space/.git" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
+          api = HfApi()
+          repo_id = "libai003/gemi01"
 
-      - name: 复制文件到 HF Space
-        if: steps.check_space.outputs.exists == 'true'
-        run: |
-          # 复制 HF 专用 Dockerfile
-          cp Dockerfile.hf /tmp/hf-space/Dockerfile
-          # 复制 README
-          cp README_HF.md /tmp/hf-space/README.md
-          # 复制源码
-          cp -r gemini_web2api/ /tmp/hf-space/
-          cp gemini_web2api.py /tmp/hf-space/
-          cp requirements.txt /tmp/hf-space/
-          cp config.example.json /tmp/hf-space/
+          # 准备 HF 专用文件
+          shutil.copy("Dockerfile.hf", "Dockerfile")
+          shutil.copy("README_HF.md", "README.md")
 
-      - name: 推送到 Hugging Face
-        if: steps.check_space.outputs.exists == 'true'
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          cd /tmp/hf-space
-          git config user.email "actions@github.com"
-          git config user.name "GitHub Actions Bot"
-          git add -A
-          git diff --cached --quiet || (git commit -m "自动部署: $(echo ${{ github.sha }} | cut -c1-8)" && git push)
+          # 上传整个仓库目录到 HF Space
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              token=os.environ["HF_TOKEN"],
+              commit_message="自动部署: 从 GitHub 同步",
+          )
+
+          print(f"✅ 成功推送到 {repo_id}")
+          EOF
