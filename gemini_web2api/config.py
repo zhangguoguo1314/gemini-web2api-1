@@ -15,6 +15,8 @@ DEFAULT_CONFIG = {
     "log_requests": True,
     "cookie_file": None,
     "proxy": None,
+    "proxy_pool": [],
+    "proxy_strategy": "round_robin",
     "api_keys": [],
 }
 
