@@ -92,6 +92,8 @@ def get_current_config() -> dict:
         "default_model": CONFIG.get("default_model", "gemini-3.5-flash"),
         "api_keys": CONFIG.get("api_keys", []),
         "proxy": CONFIG.get("proxy"),
+        "proxy_pool": CONFIG.get("proxy_pool", []),
+        "proxy_strategy": CONFIG.get("proxy_strategy", "round_robin"),
         "cookie_file": CONFIG.get("cookie_file"),
         "retry_attempts": CONFIG.get("retry_attempts", 3),
         "retry_delay_sec": CONFIG.get("retry_delay_sec", 2),
