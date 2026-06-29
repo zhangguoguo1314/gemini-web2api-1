@@ -98,8 +98,31 @@ MODELS = {
 
 def log(msg: str):
     if CONFIG["log_requests"]:
-        sys.stderr.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
         sys.stderr.flush()
+
+
+def format_proxy_url(proxy: str | None) -> str | None:
+    """Normalize proxy URL, supporting ip:port:user:pass format."""
+    if not proxy or not isinstance(proxy, str):
+        return proxy
+    proxy = proxy.strip()
+    if not proxy:
+        return None
+    if any(proxy.startswith(p) for p in ["http://", "https://", "socks5://", "socks4://"]):
+        parts = proxy.split("://", 1)
+        scheme = parts[0]
+        rest = parts[1]
+        if rest.count(":") == 3:
+            host, port, user, pw = rest.split(":")
+            return f"{scheme}://{user}:{pw}@{host}:{port}"
+        return proxy
+    if proxy.count(":") == 3:
+        host, port, user, pw = proxy.split(":")
+        return f"http://{user}:{pw}@{host}:{port}"
+    if proxy.count(":") == 1:
+        return f"http://{proxy}"
+    return proxy
 
 
 def load_cookie() -> tuple:
@@ -196,7 +219,7 @@ def gemini_stream_generate(prompt: str, model_id: int, think_mode: int) -> str:
         try:
             req = urllib.request.Request(url, data=body, headers=headers, method="POST")
             ctx = ssl.create_default_context()
-            proxy = CONFIG.get("proxy")
+            proxy = format_proxy_url(CONFIG.get("proxy"))
             if proxy:
                 opener = urllib.request.build_opener(
                     urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
@@ -262,7 +285,7 @@ def gemini_stream_generate_iter(prompt: str, model_id: int, think_mode: int):
     if sapisid:
         headers["Authorization"] = make_sapisidhash(sapisid)
 
-    proxy = CONFIG.get("proxy")
+    proxy = format_proxy_url(CONFIG.get("proxy"))
 
     if not HAS_HTTPX:
         # Fallback: non-streaming with urllib

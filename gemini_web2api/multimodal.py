@@ -8,7 +8,7 @@ import ssl
 import re
 
 from .config import CONFIG
-from .gemini import load_cookie, make_sapisidhash, _get_ssl_ctx, log
+from .gemini import load_cookie, make_sapisidhash, _get_ssl_ctx, log, get_healthy_proxy
 
 
 def _get_page_tokens() -> dict:
@@ -19,9 +19,21 @@ def _get_page_tokens() -> dict:
     cookie_str, sapisid = load_cookie()
     if cookie_str:
         headers["Cookie"] = cookie_str
+    
+    proxy = get_healthy_proxy()
+    ctx = _get_ssl_ctx()
+    
     try:
         req = urllib.request.Request("https://gemini.google.com/app", headers=headers)
-        resp = urllib.request.urlopen(req, context=_get_ssl_ctx(), timeout=30)
+        if proxy:
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
+                urllib.request.HTTPSHandler(context=ctx)
+            )
+            resp = opener.open(req, timeout=30)
+        else:
+            resp = urllib.request.urlopen(req, context=ctx, timeout=30)
+            
         html = resp.read().decode()
         tokens = {}
         for key, pattern in [
@@ -57,7 +69,7 @@ def upload_image(image_bytes: bytes, filename: str = "image.png", mime_type: str
 
     cookie_str, sapisid = load_cookie()
     ctx = _get_ssl_ctx()
-    proxy = CONFIG.get("proxy")
+    proxy = get_healthy_proxy()
 
     # Step 1: Initiate resumable upload
     start_headers = {
@@ -118,9 +130,18 @@ def upload_image(image_bytes: bytes, filename: str = "image.png", mime_type: str
 
 def fetch_image_bytes(url: str) -> bytes:
     """Fetch image from URL."""
+    proxy = get_healthy_proxy()
+    ctx = _get_ssl_ctx()
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        resp = urllib.request.urlopen(req, timeout=30)
+        if proxy:
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
+                urllib.request.HTTPSHandler(context=ctx)
+            )
+            resp = opener.open(req, timeout=30)
+        else:
+            resp = urllib.request.urlopen(req, timeout=30)
         return resp.read()
     except Exception as e:
         log(f"图片获取失败: {e}")
