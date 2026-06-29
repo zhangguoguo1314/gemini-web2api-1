@@ -1,1 +1,2 @@
 httpx[socks]>=0.25
+socksio>=0.4.0
