@@ -9,6 +9,7 @@ import ssl
 import os
 import hashlib
 import random
+import threading
 
 try:
     import httpx
@@ -23,19 +24,116 @@ _cookie_cache = {"str": "", "sapisid": None, "mtime": 0}
 _httpx_client = None
 _proxy_idx = 0
 
+# 代理健康检查相关
+_proxy_health = {}       # proxy_url -> {"status": "healthy"|"unhealthy", "cooldown_until": float}
+_proxy_stats = {}        # proxy_url -> {"requests": int, "success": int, "fail": int, "last_used": float}
+_last_request_time = 0.0
+_request_lock = threading.Lock()
+_proxy_cooldown_sec = 60  # 失败后冷却秒数
+min_request_interval = 1.0  # 请求最小间隔（秒）
+
+# 随机 User-Agent 池
+_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+]
+
 
 def get_proxy() -> str | None:
-    """从代理池中获取一个代理，支持 round_robin 和 random 策略。"""
+    """从代理池中获取一个代理（兼容旧接口，内部调用 get_healthy_proxy）。"""
+    return get_healthy_proxy()
+
+
+def get_healthy_proxy() -> str | None:
+    """从代理池中获取一个健康的代理，跳过冷却中的代理。如果所有代理都在冷却中则重置。"""
     pool = CONFIG.get("proxy_pool") or []
     if not pool:
         return CONFIG.get("proxy")
+
+    now = time.time()
+    healthy_proxies = []
+    for p in pool:
+        health = _proxy_health.get(p)
+        if health is None or health["status"] == "healthy":
+            healthy_proxies.append(p)
+        elif health["status"] == "unhealthy" and now >= health.get("cooldown_until", 0):
+            # 冷却已过期，恢复为健康
+            _proxy_health[p] = {"status": "healthy", "cooldown_until": 0}
+            healthy_proxies.append(p)
+
+    if not healthy_proxies:
+        # 所有代理都在冷却中，重置全部为健康
+        for p in pool:
+            _proxy_health[p] = {"status": "healthy", "cooldown_until": 0}
+        healthy_proxies = list(pool)
+        log("所有代理都在冷却中，已重置为健康状态")
+
     strategy = CONFIG.get("proxy_strategy", "round_robin")
     if strategy == "random":
-        return random.choice(pool)
+        return random.choice(healthy_proxies)
+
     global _proxy_idx
-    proxy = pool[_proxy_idx % len(pool)]
+    # 从健康代理中按轮询选择
+    proxy = healthy_proxies[_proxy_idx % len(healthy_proxies)]
     _proxy_idx += 1
     return proxy
+
+
+def report_proxy_result(proxy: str | None, success: bool):
+    """上报代理请求结果，成功时更新统计，失败时标记冷却。"""
+    if not proxy:
+        return
+    with _request_lock:
+        now = time.time()
+        if proxy not in _proxy_stats:
+            _proxy_stats[proxy] = {"requests": 0, "success": 0, "fail": 0, "last_used": 0}
+        stats = _proxy_stats[proxy]
+        stats["requests"] += 1
+        stats["last_used"] = now
+        if success:
+            stats["success"] += 1
+            _proxy_health[proxy] = {"status": "healthy", "cooldown_until": 0}
+        else:
+            stats["fail"] += 1
+            _proxy_health[proxy] = {"status": "unhealthy", "cooldown_until": now + _proxy_cooldown_sec}
+
+
+def get_proxy_stats() -> dict:
+    """返回每个代理的请求次数、成功次数、失败次数及健康状态。"""
+    pool = CONFIG.get("proxy_pool") or []
+    single = CONFIG.get("proxy")
+    all_proxies = list(pool)
+    if single and single not in all_proxies:
+        all_proxies.append(single)
+    result = {}
+    now = time.time()
+    for p in all_proxies:
+        stats = _proxy_stats.get(p, {"requests": 0, "success": 0, "fail": 0, "last_used": 0})
+        health = _proxy_health.get(p)
+        status = "healthy"
+        if health and health["status"] == "unhealthy":
+            if now < health.get("cooldown_until", 0):
+                status = "unhealthy"
+            else:
+                status = "healthy"
+        result[p] = {
+            "requests": stats["requests"],
+            "success": stats["success"],
+            "fail": stats["fail"],
+            "last_used": stats["last_used"],
+            "status": status,
+        }
+    return result
 
 
 def log(msg: str):
@@ -109,7 +207,7 @@ def _build_headers() -> dict:
         "Origin": "https://gemini.google.com",
         "Referer": f"https://gemini.google.com{account_prefix}/app",
         "X-Same-Domain": "1",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": random.choice(_USER_AGENTS),
     }
     if account_prefix:
         headers["X-Goog-AuthUser"] = str(CONFIG["auth_user"])
@@ -222,6 +320,13 @@ def extract_response_text(raw: str) -> str:
 
 def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None, extra_fields: dict = None) -> tuple:
     """Non-streaming generation with retry. Returns (text, account_id)."""
+    # 请求间隔控制
+    with _request_lock:
+        elapsed = time.time() - _last_request_time
+        if elapsed < min_request_interval:
+            time.sleep(min_request_interval - elapsed)
+        _last_request_time = time.time()
+
     body = _build_payload(prompt, model_id, think_mode, file_refs, extra_fields).encode()
     url = _get_url()
     headers, acc_id = _build_headers()
@@ -230,7 +335,7 @@ def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None
     last_err = None
     for attempt in range(CONFIG["retry_attempts"]):
         try:
-            proxy = get_proxy()
+            proxy = get_healthy_proxy()
             if HAS_HTTPX:
                 transport = httpx.HTTPTransport(proxy=proxy) if proxy else None
                 with httpx.Client(transport=transport, timeout=CONFIG["request_timeout_sec"], verify=True) as client:
@@ -247,9 +352,11 @@ def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None
                 else:
                     resp = urllib.request.urlopen(req, context=ctx, timeout=CONFIG["request_timeout_sec"])
                 raw = resp.read().decode("utf-8", errors="replace")
+            report_proxy_result(proxy, True)
             return extract_response_text(raw), acc_id
         except Exception as e:
             last_err = e
+            report_proxy_result(proxy, False)
             if attempt < CONFIG["retry_attempts"] - 1:
                 log(f"重试 {attempt+1}/{CONFIG['retry_attempts']}: {e}")
                 time.sleep(CONFIG["retry_delay_sec"])
@@ -264,6 +371,13 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
             yield text, acc_id
         return
 
+    # 请求间隔控制
+    with _request_lock:
+        elapsed = time.time() - _last_request_time
+        if elapsed < min_request_interval:
+            time.sleep(min_request_interval - elapsed)
+        _last_request_time = time.time()
+
     body = _build_payload(prompt, model_id, think_mode, file_refs, extra_fields)
     url = _get_url()
     headers, acc_id = _build_headers()
@@ -271,7 +385,7 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
     last_err = None
     for attempt in range(CONFIG["retry_attempts"]):
         try:
-            proxy = get_proxy()
+            proxy = get_healthy_proxy()
             transport = httpx.HTTPTransport(proxy=proxy) if proxy else None
             with httpx.Client(transport=transport, timeout=CONFIG["request_timeout_sec"], verify=True) as client:
                 prev_text = ""
@@ -289,9 +403,11 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
                                     if delta:
                                         yield delta, acc_id
                                     prev_text = t
+            report_proxy_result(proxy, True)
             return
         except Exception as e:
             last_err = e
+            report_proxy_result(proxy, False)
             if attempt < CONFIG["retry_attempts"] - 1:
                 log(f"流式重试 {attempt+1}/{CONFIG['retry_attempts']}: {e}")
                 time.sleep(CONFIG["retry_delay_sec"])
