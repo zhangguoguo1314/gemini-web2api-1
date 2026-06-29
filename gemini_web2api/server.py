@@ -17,8 +17,10 @@ from .admin import (
     is_password_set, set_password, verify_admin_password,
     create_session, verify_session, clear_session,
     set_config_file, get_current_config, update_config,
-    save_cookie, get_cookie
+    save_cookie, get_cookie,
+    get_proxy_stats, test_proxy, test_all_proxies
 )
+from .gemini import generate, generate_stream, log, get_proxy as gemini_get_proxy
 from .account_pool import (
     set_account_file, get_accounts, add_account, update_account,
     delete_account, test_account, get_pool_stats, record_request,
@@ -207,6 +209,14 @@ class GeminiHandler(BaseHTTPRequestHandler):
                 self.send_json({"cookie": get_cookie()})
                 return
 
+            # Admin API: proxy-stats
+            if self.path == "/admin/api/proxy-stats":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                self.send_json({"proxy_stats": get_proxy_stats()})
+                return
+
             # API routes (require auth if configured, but skip if admin session exists)
             is_admin = bool(self._get_cookie("admin_session"))
             if self.path.startswith("/v1/") and not self._authorized() and not is_admin:
@@ -336,6 +346,28 @@ class GeminiHandler(BaseHTTPRequestHandler):
                     return
                 save_cookie(req["cookie"])
                 self.send_json({"success": True})
+                return
+
+            # Admin API: test single proxy
+            if self.path == "/admin/api/proxy-test":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                req = self._parse_body(body)
+                if not req or not req.get("proxy"):
+                    self.send_json({"error": "代理地址不能为空"}, 400)
+                    return
+                result = test_proxy(req["proxy"])
+                self.send_json(result)
+                return
+
+            # Admin API: test all proxies
+            if self.path == "/admin/api/proxy-test-all":
+                if not self._check_admin_auth():
+                    self.send_json({"error": "未登录"}, 401)
+                    return
+                result = test_all_proxies()
+                self.send_json(result)
                 return
 
             # OpenAI API routes
