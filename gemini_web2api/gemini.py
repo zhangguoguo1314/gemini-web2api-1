@@ -320,6 +320,7 @@ def extract_response_text(raw: str) -> str:
 
 def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None, extra_fields: dict = None) -> tuple:
     """Non-streaming generation with retry. Returns (text, account_id)."""
+    global _last_request_time
     # 请求间隔控制
     with _request_lock:
         elapsed = time.time() - _last_request_time
@@ -371,6 +372,7 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
             yield text, acc_id
         return
 
+    global _last_request_time
     # 请求间隔控制
     with _request_lock:
         elapsed = time.time() - _last_request_time
