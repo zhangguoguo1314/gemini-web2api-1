@@ -89,3 +89,50 @@ def test_all_proxies() -> dict:
     for p in all_proxies:
         results[p] = test_proxy(p)
     return results
+
+# ─── Session & Auth Helpers ──────────────────────────────────────────────────
+_admin_password_hash = None
+_sessions = set()
+_config_file = None
+
+def is_password_set() -> bool:
+    return _admin_password_hash is not None
+
+def set_password(password: str):
+    global _admin_password_hash
+    import hashlib
+    _admin_password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+def verify_admin_password(password: str) -> bool:
+    import hashlib
+    h = hashlib.sha256(password.encode()).hexdigest()
+    return h == _admin_password_hash
+
+def create_session() -> str:
+    import uuid
+    token = uuid.uuid4().hex
+    _sessions.add(token)
+    return token
+
+def verify_session(token: str) -> bool:
+    return token in _sessions
+
+def clear_session(token: str):
+    if token in _sessions:
+        _sessions.remove(token)
+
+def set_config_file(path: str):
+    global _config_file
+    _config_file = path
+
+def save_cookie(cookie: str):
+    CONFIG["cookie_file"] = "cookie.txt"
+    with open("cookie.txt", "w") as f:
+        f.write(cookie)
+
+def get_cookie() -> str:
+    cf = CONFIG.get("cookie_file")
+    if cf and os.path.exists(cf):
+        with open(cf, "r") as f:
+            return f.read()
+    return ""
