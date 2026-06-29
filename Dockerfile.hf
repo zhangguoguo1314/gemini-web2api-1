@@ -16,14 +16,16 @@ COPY gemini_web2api.py ./
 
 # HF Spaces 默认端口为 7860
 COPY config.example.json ./config.json
-RUN sed -i 's/"port": 8081/"port": 7860/' config.json
+RUN sed -i 's/"port": 8081/"port": 7860/' config.json && \
+    sed -i 's/"host": "0.0.0.0"/"host": "0.0.0.0"/' config.json
 
-RUN chown -R user:user /app
+RUN chown -R user:user /app && chmod -R 777 /app
 
 USER user
-
 ENV HOME=/home/user
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 7860
 
-CMD ["python", "-m", "gemini_web2api", "--config", "/app/config.json"]
+# 显式指定 host 为 0.0.0.0 确保外部可访问
+CMD ["python", "-m", "gemini_web2api", "--config", "/app/config.json", "--port", "7860"]

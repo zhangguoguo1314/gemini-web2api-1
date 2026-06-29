@@ -40,7 +40,8 @@ def main():
     init_pool_from_cookie()
 
     port = CONFIG["port"]
-    server = ThreadedServer((CONFIG["host"], port), GeminiHandler)
+    host = CONFIG.get("host", "0.0.0.0")
+    server = ThreadedServer((host, port), GeminiHandler)
     print(f"gemini-web2api v{__version__}")
     print(f"  监听地址:  http://0.0.0.0:{port}")
     print(f"  接口地址:  http://localhost:{port}/v1")
