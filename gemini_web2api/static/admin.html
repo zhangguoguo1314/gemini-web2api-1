@@ -635,6 +635,10 @@ tr:hover td { background: var(--bg3); }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
         模型管理
       </button>
+      <button class="nav-item" data-page="proxies" onclick="showPage('proxies')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.83a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+        代理池
+      </button>
       <button class="nav-item" data-page="config" onclick="showPage('config')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.68 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         系统配置
@@ -913,6 +917,68 @@ sk-yyyy" rows="4"></textarea>
           <p class="help">Cookie 用于解锁 Gemini Advanced 的 Pro 模型。免费账号也能用，但 Pro 实际走 Flash。</p>
         </div>
         <button class="btn btn-primary" onclick="saveCookieConfig()">保存 Cookie</button>
+      </div>
+    </div>
+
+    <!-- Proxies Page -->
+    <div id="page-proxies" class="page hidden">
+      <h2 class="page-title">代理池管理</h2>
+      <div class="section">
+        <h3 class="section-title">代理列表</h3>
+        <div class="form-group">
+          <label>轮询策略</label>
+          <select id="proxy-strategy">
+            <option value="round_robin">轮询（均匀分配）</option>
+            <option value="random">随机</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table id="proxies-table">
+            <thead><tr><th>代理地址</th><th>操作</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p class="help" id="proxy-count">共 0 个代理</p>
+      </div>
+      <div class="section">
+        <h3 class="section-title">添加代理</h3>
+        <div class="form-group">
+          <label>协议</label>
+          <select id="proxy-protocol">
+            <option value="socks5">SOCKS5</option>
+            <option value="http">HTTP</option>
+            <option value="https">HTTPS</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>IP 地址</label>
+          <input type="text" id="proxy-ip" placeholder="例如：38.154.185.97">
+        </div>
+        <div class="form-group">
+          <label>端口</label>
+          <input type="number" id="proxy-port" placeholder="例如：6370">
+        </div>
+        <div class="form-group">
+          <label>用户名（可选）</label>
+          <input type="text" id="proxy-user" placeholder="用户名">
+        </div>
+        <div class="form-group">
+          <label>密码（可选）</label>
+          <input type="password" id="proxy-pass" placeholder="密码">
+        </div>
+        <button class="btn btn-primary" onclick="addProxy()">添加代理</button>
+      </div>
+      <div class="section">
+        <h3 class="section-title">批量导入</h3>
+        <div class="form-group">
+          <label>每行一个代理，格式：协议://用户名:密码@IP:端口</label>
+          <textarea id="proxy-batch" rows="5" placeholder="socks5://user:pass@ip:port
+http://user:pass@ip:port"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="importProxies()">批量导入</button>
+      </div>
+      <div class="section">
+        <button class="btn btn-error" onclick="saveProxyConfig()">保存代理池配置</button>
       </div>
     </div>
   </main>
@@ -1454,6 +1520,8 @@ async function loadModels() {
 }
 
 // Load config
+let _proxyList = [];
+
 async function loadConfig() {
   try {
     const cfg = await apiGet('/admin/api/config');
@@ -1462,15 +1530,93 @@ async function loadConfig() {
     document.getElementById('cfg-proxy').value = cfg.proxy || '';
     document.getElementById('cfg-timeout').value = cfg.request_timeout_sec || 180;
     document.getElementById('cfg-retry').value = cfg.retry_attempts || 3;
+    // Load proxy pool
+    _proxyList = cfg.proxy_pool || [];
+    document.getElementById('proxy-strategy').value = cfg.proxy_strategy || 'round_robin';
+    renderProxies();
   } catch (e) {
     toast('加载配置失败: ' + e.message, 'error');
   }
-  
+
   try {
     const cookieData = await apiGet('/admin/api/cookie');
     document.getElementById('cfg-cookie').value = cookieData.cookie || '';
   } catch (e) {
     // ignore
+  }
+}
+
+function renderProxies() {
+  const tbody = document.querySelector('#proxies-table tbody');
+  tbody.innerHTML = '';
+  _proxyList.forEach((p, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="font-family:monospace;word-break:break-all;">${escapeHtml(p)}</td><td><button class="btn btn-sm" onclick="removeProxy(${i})">删除</button></td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('proxy-count').textContent = `共 ${_proxyList.length} 个代理`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function addProxy() {
+  const protocol = document.getElementById('proxy-protocol').value;
+  const ip = document.getElementById('proxy-ip').value.trim();
+  const port = document.getElementById('proxy-port').value.trim();
+  const user = document.getElementById('proxy-user').value.trim();
+  const pass = document.getElementById('proxy-pass').value.trim();
+  if (!ip || !port) { toast('IP 和端口必填', 'error'); return; }
+  let url = `${protocol}://`;
+  if (user) {
+    url += encodeURIComponent(user);
+    if (pass) url += ':' + encodeURIComponent(pass);
+    url += '@';
+  }
+  url += `${ip}:${port}`;
+  _proxyList.push(url);
+  renderProxies();
+  document.getElementById('proxy-ip').value = '';
+  document.getElementById('proxy-port').value = '';
+  document.getElementById('proxy-user').value = '';
+  document.getElementById('proxy-pass').value = '';
+  toast('已添加，记得点击保存', 'success');
+}
+
+function removeProxy(idx) {
+  _proxyList.splice(idx, 1);
+  renderProxies();
+}
+
+function importProxies() {
+  const text = document.getElementById('proxy-batch').value.trim();
+  if (!text) return;
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  let added = 0;
+  lines.forEach(line => {
+    if (line && !_proxyList.includes(line)) {
+      _proxyList.push(line);
+      added++;
+    }
+  });
+  renderProxies();
+  document.getElementById('proxy-batch').value = '';
+  toast(`批量导入 ${added} 个代理`, 'success');
+}
+
+async function saveProxyConfig() {
+  const updates = {
+    proxy_pool: _proxyList,
+    proxy_strategy: document.getElementById('proxy-strategy').value,
+  };
+  try {
+    await apiPost('/admin/api/config', updates);
+    toast('代理池配置已保存', 'success');
+  } catch (e) {
+    toast('保存失败: ' + e.message, 'error');
   }
 }
 
