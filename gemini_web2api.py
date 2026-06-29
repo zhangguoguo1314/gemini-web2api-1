@@ -103,25 +103,34 @@ def log(msg: str):
 
 
 def format_proxy_url(proxy: str | None) -> str | None:
-    """Normalize proxy URL, supporting ip:port:user:pass format."""
+    """标准化代理 URL，支持多种格式。"""
     if not proxy or not isinstance(proxy, str):
         return proxy
+    
     proxy = proxy.strip()
     if not proxy:
         return None
-    if any(proxy.startswith(p) for p in ["http://", "https://", "socks5://", "socks4://"]):
-        parts = proxy.split("://", 1)
-        scheme = parts[0]
-        rest = parts[1]
-        if rest.count(":") == 3:
-            host, port, user, pw = rest.split(":")
-            return f"{scheme}://{user}:{pw}@{host}:{port}"
-        return proxy
-    if proxy.count(":") == 3:
-        host, port, user, pw = proxy.split(":")
-        return f"http://{user}:{pw}@{host}:{port}"
-    if proxy.count(":") == 1:
-        return f"http://{proxy}"
+        
+    # 检查是否有协议头
+    scheme = None
+    rest = proxy
+    if "://" in proxy:
+        scheme, rest = proxy.split("://", 1)
+    
+    # 处理 rest 部分 (ip:port:user:pass 或 user:pass@ip:port)
+    if "@" in rest:
+        # 已经是标准格式 user:pass@ip:port
+        return f"{scheme or 'http'}://{rest}"
+    
+    if rest.count(":") == 3:
+        # ip:port:user:pass
+        parts = rest.split(":")
+        return f"{scheme or 'http'}://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+    
+    if rest.count(":") == 1:
+        # ip:port
+        return f"{scheme or 'http'}://{rest}"
+        
     return proxy
 
 
@@ -296,8 +305,7 @@ def gemini_stream_generate_iter(prompt: str, model_id: int, think_mode: int):
         return
 
     prev_text = ""
-    transport = httpx.HTTPTransport(proxy=proxy) if proxy else None
-    with httpx.Client(transport=transport, timeout=CONFIG["request_timeout_sec"], verify=True) as client:
+    with httpx.Client(proxy=proxy, timeout=CONFIG["request_timeout_sec"], verify=True) as client:
         with client.stream("POST", url, content=body, headers=headers) as resp:
             buf = ""
             for chunk in resp.iter_text():

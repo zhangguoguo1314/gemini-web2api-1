@@ -47,26 +47,28 @@ def test_proxy(proxy_url: str) -> dict:
     
     try:
         start = _time.time()
-        if formatted_proxy and formatted_proxy.startswith("socks"):
-            # SOCKS 代理需要 httpx
+        if formatted_proxy:
+            # 统一使用 httpx 进行测试，支持 SOCKS 和 HTTP
             try:
                 import httpx
-                transport = httpx.HTTPTransport(proxy=formatted_proxy)
-                with httpx.Client(transport=transport, timeout=10, verify=True) as client:
+                with httpx.Client(proxy=formatted_proxy, timeout=10, verify=True, follow_redirects=True) as client:
                     resp = client.get(test_url)
                     resp.raise_for_status()
             except ImportError:
-                return {"success": False, "error": "SOCKS 代理需要安装 httpx 和 httpx[socks]"}
-        else:
-            # HTTP 代理
-            if formatted_proxy:
+                if formatted_proxy.startswith("socks"):
+                    return {"success": False, "error": "SOCKS 代理需要安装 httpx 和 httpx[socks]"}
+                # 回退到 urllib
                 proxy_handler = urllib.request.ProxyHandler({"http": formatted_proxy, "https": formatted_proxy})
                 opener = urllib.request.build_opener(proxy_handler)
                 resp = opener.open(test_url, timeout=10)
                 resp.read()
-            else:
-                resp = urllib.request.urlopen(test_url, timeout=10)
-                resp.read()
+            except Exception as e:
+                # 记录详细错误
+                return {"success": False, "error": f"代理测试失败: {str(e)}"}
+        else:
+            # 无代理
+            resp = urllib.request.urlopen(test_url, timeout=10)
+            resp.read()
                 
         elapsed = round(_time.time() - start, 2)
         gemini.report_proxy_result(proxy_url, True)
