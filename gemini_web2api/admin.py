@@ -41,7 +41,7 @@ def get_proxy_stats() -> dict:
 
 def test_proxy(proxy_url: str) -> dict:
     """测试单个代理的连通性。"""
-    test_url = "https://gemini.google.com"
+    test_url = "https://www.google.com"
     # 标准化代理 URL
     formatted_proxy = gemini.format_proxy_url(proxy_url)
     
@@ -51,7 +51,8 @@ def test_proxy(proxy_url: str) -> dict:
             # 统一使用 httpx 进行测试，支持 SOCKS 和 HTTP
             try:
                 import httpx
-                with httpx.Client(proxy=formatted_proxy, timeout=10, verify=True, follow_redirects=True) as client:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                with httpx.Client(proxy=formatted_proxy, timeout=10, verify=True, follow_redirects=True, headers=headers) as client:
                     resp = client.get(test_url)
                     resp.raise_for_status()
             except ImportError:
