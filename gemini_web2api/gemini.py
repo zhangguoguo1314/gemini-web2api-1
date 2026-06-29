@@ -8,6 +8,7 @@ import urllib.parse
 import ssl
 import os
 import hashlib
+import random
 
 try:
     import httpx
@@ -20,6 +21,21 @@ from .config import CONFIG
 _ssl_ctx = None
 _cookie_cache = {"str": "", "sapisid": None, "mtime": 0}
 _httpx_client = None
+_proxy_idx = 0
+
+
+def get_proxy() -> str | None:
+    """从代理池中获取一个代理，支持 round_robin 和 random 策略。"""
+    pool = CONFIG.get("proxy_pool") or []
+    if not pool:
+        return CONFIG.get("proxy")
+    strategy = CONFIG.get("proxy_strategy", "round_robin")
+    if strategy == "random":
+        return random.choice(pool)
+    global _proxy_idx
+    proxy = pool[_proxy_idx % len(pool)]
+    _proxy_idx += 1
+    return proxy
 
 
 def log(msg: str):
@@ -34,15 +50,6 @@ def _get_ssl_ctx():
     if _ssl_ctx is None:
         _ssl_ctx = ssl.create_default_context()
     return _ssl_ctx
-
-
-def _get_httpx_client():
-    global _httpx_client
-    if _httpx_client is None and HAS_HTTPX:
-        proxy = CONFIG.get("proxy")
-        transport = httpx.HTTPTransport(proxy=proxy) if proxy else None
-        _httpx_client = httpx.Client(transport=transport, timeout=CONFIG["request_timeout_sec"], verify=True)
-    return _httpx_client
 
 
 def load_cookie() -> tuple:
@@ -219,21 +226,27 @@ def generate(prompt: str, model_id: int, think_mode: int, file_refs: list = None
     url = _get_url()
     headers, acc_id = _build_headers()
     ctx = _get_ssl_ctx()
-    proxy = CONFIG.get("proxy")
 
     last_err = None
     for attempt in range(CONFIG["retry_attempts"]):
         try:
-            req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-            if proxy:
-                opener = urllib.request.build_opener(
-                    urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
-                    urllib.request.HTTPSHandler(context=ctx)
-                )
-                resp = opener.open(req, timeout=CONFIG["request_timeout_sec"])
+            proxy = get_proxy()
+            if HAS_HTTPX:
+                transport = httpx.HTTPTransport(proxy=proxy) if proxy else None
+                with httpx.Client(transport=transport, timeout=CONFIG["request_timeout_sec"], verify=True) as client:
+                    resp = client.post(url, content=body, headers=headers)
+                    raw = resp.text
             else:
-                resp = urllib.request.urlopen(req, context=ctx, timeout=CONFIG["request_timeout_sec"])
-            raw = resp.read().decode("utf-8", errors="replace")
+                req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+                if proxy:
+                    opener = urllib.request.build_opener(
+                        urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
+                        urllib.request.HTTPSHandler(context=ctx)
+                    )
+                    resp = opener.open(req, timeout=CONFIG["request_timeout_sec"])
+                else:
+                    resp = urllib.request.urlopen(req, context=ctx, timeout=CONFIG["request_timeout_sec"])
+                raw = resp.read().decode("utf-8", errors="replace")
             return extract_response_text(raw), acc_id
         except Exception as e:
             last_err = e
@@ -254,26 +267,28 @@ def generate_stream(prompt: str, model_id: int, think_mode: int, file_refs: list
     body = _build_payload(prompt, model_id, think_mode, file_refs, extra_fields)
     url = _get_url()
     headers, acc_id = _build_headers()
-    client = _get_httpx_client()
 
     last_err = None
     for attempt in range(CONFIG["retry_attempts"]):
         try:
-            prev_text = ""
-            with client.stream("POST", url, content=body, headers=headers) as resp:
-                buf = ""
-                for chunk in resp.iter_text():
-                    buf += chunk
-                    if "BardErrorInfo" in buf:
-                        _check_bard_error(buf)
-                    while "\n" in buf:
-                        line, buf = buf.split("\n", 1)
-                        for t in _extract_texts_from_line(line):
-                            if len(t) > len(prev_text):
-                                delta = clean_text(t[len(prev_text):])
-                                if delta:
-                                    yield delta, acc_id
-                                prev_text = t
+            proxy = get_proxy()
+            transport = httpx.HTTPTransport(proxy=proxy) if proxy else None
+            with httpx.Client(transport=transport, timeout=CONFIG["request_timeout_sec"], verify=True) as client:
+                prev_text = ""
+                with client.stream("POST", url, content=body, headers=headers) as resp:
+                    buf = ""
+                    for chunk in resp.iter_text():
+                        buf += chunk
+                        if "BardErrorInfo" in buf:
+                            _check_bard_error(buf)
+                        while "\n" in buf:
+                            line, buf = buf.split("\n", 1)
+                            for t in _extract_texts_from_line(line):
+                                if len(t) > len(prev_text):
+                                    delta = clean_text(t[len(prev_text):])
+                                    if delta:
+                                        yield delta, acc_id
+                                    prev_text = t
             return
         except Exception as e:
             last_err = e
