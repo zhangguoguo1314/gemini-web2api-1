@@ -924,7 +924,9 @@ sk-yyyy" rows="4"></textarea>
     <div id="page-proxies" class="page hidden">
       <h2 class="page-title">代理池管理</h2>
       <div class="section">
-        <h3 class="section-title">代理列表</h3>
+        <h3 class="section-title">代理列表
+          <button class="btn btn-success" onclick="testAllProxies()">测试所有代理</button>
+        </h3>
         <div class="form-group">
           <label>轮询策略</label>
           <select id="proxy-strategy">
@@ -934,7 +936,7 @@ sk-yyyy" rows="4"></textarea>
         </div>
         <div class="table-wrap">
           <table id="proxies-table">
-            <thead><tr><th>代理地址</th><th>操作</th></tr></thead>
+            <thead><tr><th>代理地址</th><th>状态</th><th>成功/总请求</th><th>最后使用</th><th>操作</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -1173,6 +1175,7 @@ function showPage(page) {
   if (page === 'accounts') loadAccounts();
   if (page === 'stats') loadStats();
   if (page === 'logs') loadLogs(0);
+  if (page === 'proxies') loadProxyStats();
 }
 
 // Auto refresh dashboard & stats
@@ -1521,6 +1524,7 @@ async function loadModels() {
 
 // Load config
 let _proxyList = [];
+let _proxyStats = {};
 
 async function loadConfig() {
   try {
@@ -1532,6 +1536,7 @@ async function loadConfig() {
     document.getElementById('cfg-retry').value = cfg.retry_attempts || 3;
     // Load proxy pool
     _proxyList = cfg.proxy_pool || [];
+    _proxyStats = cfg.proxy_stats || {};
     document.getElementById('proxy-strategy').value = cfg.proxy_strategy || 'round_robin';
     renderProxies();
   } catch (e) {
@@ -1551,10 +1556,59 @@ function renderProxies() {
   tbody.innerHTML = '';
   _proxyList.forEach((p, i) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td style="font-family:monospace;word-break:break-all;">${escapeHtml(p)}</td><td><button class="btn btn-sm" onclick="removeProxy(${i})">删除</button></td>`;
+    const stats = _proxyStats[p] || { status: 'healthy', success: 0, requests: 0, last_used: 0 };
+    const statusBadge = stats.status === 'healthy'
+      ? '<span class="badge badge-success">健康</span>'
+      : '<span class="badge badge-error">冷却中</span>';
+    const reqInfo = `${stats.success}/${stats.requests}`;
+    const lastUsed = stats.last_used ? timeAgo(stats.last_used) : '-';
+    tr.innerHTML = `<td style="font-family:monospace;word-break:break-all;">${escapeHtml(p)}</td><td>${statusBadge}</td><td>${reqInfo}</td><td>${lastUsed}</td><td><button class="btn btn-success btn-sm" onclick="testSingleProxy('${escapeHtml(p)}')">测试</button> <button class="btn btn-danger btn-sm" onclick="removeProxy(${i})">删除</button></td>`;
     tbody.appendChild(tr);
   });
   document.getElementById('proxy-count').textContent = `共 ${_proxyList.length} 个代理`;
+}
+
+async function loadProxyStats() {
+  try {
+    const data = await apiGet('/admin/api/proxy-stats');
+    _proxyStats = data.proxy_stats || {};
+    renderProxies();
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function testSingleProxy(proxy) {
+  toast('正在测试代理...', 'info');
+  try {
+    const res = await apiPost('/admin/api/proxy-test', { proxy: proxy });
+    if (res.success) {
+      toast('测试通过，延迟: ' + (res.latency || '?') + 's', 'success');
+    } else {
+      toast('测试失败: ' + (res.error || '未知错误'), 'error');
+    }
+    loadProxyStats();
+  } catch (e) {
+    toast('测试失败: ' + e.message, 'error');
+  }
+}
+
+async function testAllProxies() {
+  toast('正在批量测试所有代理...', 'info');
+  try {
+    const res = await apiPost('/admin/api/proxy-test-all', {});
+    const results = res || {};
+    let okCount = 0;
+    let failCount = 0;
+    for (const [proxy, r] of Object.entries(results)) {
+      if (r && r.success) okCount++;
+      else failCount++;
+    }
+    toast(`测试完成: ${okCount} 成功, ${failCount} 失败`, okCount > 0 ? 'success' : 'error');
+    loadProxyStats();
+  } catch (e) {
+    toast('批量测试失败: ' + e.message, 'error');
+  }
 }
 
 function escapeHtml(text) {
